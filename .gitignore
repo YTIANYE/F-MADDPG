@@ -1,0 +1,15 @@
+# Created by .ignore support plugin (hsz.mobi)
+### Python template
+
+
+# IntelliJ project files
+.idea
+*.iml
+.md
+/logs/
+/logs_age/
+/logs_age_and_average/
+/logs_average/
+/logs_templete/
+/logsTest/
+
