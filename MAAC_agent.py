@@ -761,8 +761,8 @@ class MAACAgent(object):
                                                                                   epoch))  # TODO reward?
                 """tensorboard 喂入需要监听的数据"""
                 with summary_writer.as_default():  # Summary： 所有需要在TensorBoard上展示的统计结果
-                    tf.summary.scalar('Main/episode_reward', total_reward, step=episode)  # 添加标量统计结果
-                    # tf.summary.scalar('Main/episode_steps', steps, step=episode)
+                    # tf.summary.scalar('Main/episode_reward', total_reward, step=episode)  # 添加标量统计结果
+                    tf.summary.scalar('Main/episode_steps', steps, step=episode)
                     # tf.summary.trace_export(name="model_trace", step=0, profiler_outdir=train_log_dir)
 
                 summary_writer.flush()
