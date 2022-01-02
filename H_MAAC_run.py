@@ -87,7 +87,7 @@ def experiment_5():
     """
     变量：数据源个数
     """
-    sensor_nums = [60]
+    sensor_nums = [30]
     # sample_methods = [1, 2]  # 默认方式二 # 采样方式一 1；    采样方式二 2
     sample_methods = [1]
     for sample in sample_methods:

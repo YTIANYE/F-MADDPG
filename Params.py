@@ -3,10 +3,10 @@ import numpy as np
 import random
 
 map_size = 200
-# agent_num = 4
-# sensor_num = 30
-agent_num = 8
-sensor_num = 60
+agent_num = 4
+sensor_num = 30
+# agent_num = 8
+# sensor_num = 60
 obs_r = 60  # 观察半径
 collect_r = 40  # 收集覆盖半径
 speed = 6  # 移动半径
