@@ -136,16 +136,22 @@ class EdgeDevice(object):
             if self.total_data[data2process[self.action.execution.index(1)][0]][0] >= 20000:
                 print("数据大小大于20000的", self.total_data[data2process[self.action.execution.index(1)][0]][0])
             tmp_size += min(self.total_data[data2process[self.action.execution.index(1)][0]][0],
-                            self.computing_rate * t)  # 如果要处理的数据大小超过了该时间段内的处理能力，新增加的空间大小则是这段时间里最大处理能力所能处理的数据大小
+                            self.computing_rate * t)    # 如果要处理的数据大小超过了该时间段内的处理能力，
+                                                        #新增加的空间大小则是这段时间里最大处理能力所能处理的数据大小
             self.total_data[data2process[self.action.execution.index(1)][0]][
                 0] -= self.computing_rate * t  # 该时间段内 需要处理的数据量减少
             if self.total_data[data2process[self.action.execution.index(1)][0]][0] <= 0:  # 数据全部处理
                 self.total_data[data2process[self.action.execution.index(1)][0]][
-                    0] = tmp_size  # 这里没有问题，本身就是这样设计的：大于20000的数据在减去20000之后，这个20000可能会加入到下一step执行的某个小于20000的任务（由于下一步执行任务随机，不一定是被减去20000的那个任务），作为一个完成的任务放在done_data中，年龄不受影响，但是两个源自不同数据源的任务的数据大小交换了20000，
+                    0] = tmp_size   # 这里没有问题，本身就是这样设计的：大于20000的数据在减去20000之后，
+                                    #这个20000可能会加入到下一step执行的某个小于20000的任务
+                                    #（由于下一步执行任务随机，不一定是被减去20000的那个任务），
+                                    #作为一个完成的任务放在done_data中，年龄不受影响，但是两个源自不同数据源的任务的数据大小交换了20000，
                 self.done_data.append(self.total_data[data2process[self.action.execution.index(1)][0]])
                 self.total_data.pop(data2process[self.action.execution.index(1)][0])  # 这一数据被处理完
                 tmp_size = 0
-                # tmp_size含义：如果一个数据源的某个任务数据超过20000，需要处理多次，tmp_size记录处理过的数据量，当同一阿哥明天的total_data中的某个数据大小小于20000，处理完该任务，连同之前处理的n个20000加在一起等待卸载，tmp_size记录的就是该agent处理完的数据大小，不区分数据源
+                # tmp_size含义：如果一个数据源的某个任务数据超过20000，需要处理多次，tmp_size记录处理过的数据量，
+                #当同一agent的total_data中的某个数据大小小于20000，处理完该任务，连同之前处理的n个20000加在一起等待卸载，
+                #tmp_size记录的就是该agent处理完的数据大小，不区分数据源
         # 调试用
         if tmp_size > 0:
             print(tmp_size)
