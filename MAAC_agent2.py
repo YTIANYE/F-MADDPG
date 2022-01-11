@@ -646,12 +646,6 @@ class MAACAgent2(object):
             """next actions & reward"""
             new_c_actions = self.target_center_actor.predict(
                 [new_done_buffer_list, new_pos_list, np.array([self.theOmega] * self.batch_size)])[0]  # need to change here--done--------
-
-            #issue here!
-            for each in [new_done_buffer_list, new_pos_list, new_c_actions]:
-                print(each.shape)
-            #possibel err with new c actions?
-
             cq_future = self.target_center_critic.predict([new_done_buffer_list, new_pos_list, new_c_actions])
 
             
@@ -671,8 +665,9 @@ class MAACAgent2(object):
             """训练 center_actor 网络 train center actor"""
             with tf.GradientTape() as tape:
                 tape.watch(self.center_actor.trainable_variables)
-                c_act, self.theOmega = self.center_actor([done_buffer_list, pos_list, np.array(
-                    [[self.theOmega]])])  # need to change here------done-------------------------
+                oemgaToInput = np.array([self.theOmega]*self.batch_size).reshape((self.batch_size,1))
+                c_act, self.theOmega = self.center_actor(
+                    [done_buffer_list, pos_list, oemgaToInput])  # need to change here------done---
                 ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list, c_act]))
 
             # print(self.center_critic([sensor_maps, agent_maps, c_act]))
@@ -763,6 +758,7 @@ class MAACAgent2(object):
             # 打印控制台日志
             f_print_logs = PRINT_LOGS(cur_time).open()
             print('epoch:%s reward:%f' % (epoch, cur_reward), file=f_print_logs)
+            print("Current omega:", self.theOmega)
             f_print_logs.close()
 
             """经验重放"""
