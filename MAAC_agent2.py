@@ -139,7 +139,7 @@ def center_actor(input_dim_list, cnn_kernel_size):
     mixWithOmega = layers.concatenate([bandwidth_dense, Omega], axis=-1)
 
     # use MLP fuse the mixture
-    afterFuse = layers.Dense(9, activation='relu')(mixWithOmega)
+    afterFuse = layers.Dense(input_dim_list[0][0]+1, activation='relu')(mixWithOmega)
 
     # sepreate output
     bandwidth_output = layers.Softmax()(afterFuse[:, :-1])
@@ -645,9 +645,16 @@ class MAACAgent2(object):
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
             """next actions & reward"""
             new_c_actions = self.target_center_actor.predict(
-                [new_done_buffer_list, new_pos_list, np.array([self.theOmega] * self.batch_size)])[
-                0]  # need to change here--done---------------------
+                [new_done_buffer_list, new_pos_list, np.array([self.theOmega] * self.batch_size)])[0]  # need to change here--done--------
+
+            #issue here!
+            for each in [new_done_buffer_list, new_pos_list, new_c_actions]:
+                print(each.shape)
+            #possibel err with new c actions?
+
             cq_future = self.target_center_critic.predict([new_done_buffer_list, new_pos_list, new_c_actions])
+
+            
             c_target_qs = c_reward + cq_future * self.gamma  # 目标reward，目标q值
             self.summaries['cq_val'] = np.average(c_reward[0])
 
@@ -664,14 +671,6 @@ class MAACAgent2(object):
             """训练 center_actor 网络 train center actor"""
             with tf.GradientTape() as tape:
                 tape.watch(self.center_actor.trainable_variables)
-
-                '''
-                #Debug
-                for each in [done_buffer_list, pos_list,self.theOmega]:
-                    print(type(each))
-                    print(each.shape)
-                '''
-
                 c_act, self.theOmega = self.center_actor([done_buffer_list, pos_list, np.array(
                     [[self.theOmega]])])  # need to change here------done-------------------------
                 ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list, c_act]))

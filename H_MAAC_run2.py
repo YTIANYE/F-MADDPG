@@ -99,8 +99,9 @@ def experiment_5():
 
 
 def H_MAAC_run2():
-    print("运行程序：H_MAAC_run")
+    print("运行程序：H_MAAC_run2")
 
     """实验运行"""
     experiment_5()
 
+H_MAAC_run2()
