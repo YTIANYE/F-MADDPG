@@ -2,7 +2,7 @@ from MEC_env import mec_def
 from MEC_env import mec_env
 from Params import *
 from print_logs import *
-import MAAC_agent
+import MAAC_agent2 as MAAC_agent
 
 import tensorflow as tf
 
@@ -38,7 +38,7 @@ def run(conditions):
     mec_world = mec_def.MEC_world(map_size, agent_num, sensor_num, obs_r, speed, collect_r, max_size, sensor_lam)
     env = mec_env.MEC_MARL_ENV(mec_world, alpha=alpha, beta=beta, aggregate_reward=aggregate_reward)
     # 建立模型
-    MAAC = MAAC_agent.MAACAgent(env, TAU, GAMMA, LR_A, LR_C, LR_A, LR_C, BATCH_SIZE, Epsilon, sample_method)
+    MAAC = MAAC_agent.MAACAgent(env, TAU, GAMMA, LR_A, LR_C, LR_A, LR_C, BATCH_SIZE, Epsilon, sample_method, theOmega=FL_omega)
 
     """训练开始"""
     # 记录环境参数
@@ -58,9 +58,10 @@ def run(conditions):
     print("开始时间:", time.localtime(startTime), file=f_print_logs)
 
     # 训练过程
-    MAAC.train(MAX_EPOCH, MAX_EP_STEPS, up_freq=up_freq, render=True, render_freq=render_freq, FL=FL,
-               FL_omega=FL_omega)
-
+    MAAC.train(MAX_EPOCH, MAX_EP_STEPS, up_freq=up_freq, render=True, render_freq=render_freq, FL=FL,FL_omega=FL_omega)
+    #MAAC.testPrint()
+    #quit()
+    
     # 统计执行时间
     endTime = time.time()
     t = endTime - startTime
@@ -96,3 +97,4 @@ def MAAC_run():
     experiment_5()
 
 
+#MAAC_run()

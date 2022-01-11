@@ -23,8 +23,8 @@ MAX_EP_STEPS = 200
 # MAX_EPOCH = 500
 # MAX_EP_STEPS = 20
 # 测试短周期
-# MAX_EPOCH = 100
-# MAX_EP_STEPS = 5
+#MAX_EPOCH = 100
+#MAX_EP_STEPS = 5
 LR_A = 0.001  # learning rate for actor
 LR_C = 0.002  # learning rate for critic
 GAMMA = 0.85  # reward discount
