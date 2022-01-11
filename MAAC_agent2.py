@@ -143,7 +143,7 @@ def center_actor(input_dim_list, cnn_kernel_size):
 
     # sepreate output
     bandwidth_output = layers.Softmax()(afterFuse[:, :-1])
-    omegaOutput = afterFuse[0][-1]
+    omegaOutput = tf.keras.activations.sigmoid(afterFuse[0][-1])
 
     # model = keras.Model(inputs=[done_buffer_list, pos_list], outputs=bandwidth_out2, name='center_actor_net')
     model = keras.Model(inputs=[done_buffer_list, pos_list, theOmega], outputs=[bandwidth_output, omegaOutput],
