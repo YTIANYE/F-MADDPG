@@ -116,7 +116,6 @@ def center_actor(input_dim_list, cnn_kernel_size):
     done_buffer_list = keras.Input(
         shape=input_dim_list[0])  # 缓冲区列表形状 shape = (None, 4, 2, 5)       # 实例化一个keras张量,shape: 形状元组（整型）
     pos_list = keras.Input(shape=input_dim_list[1])  # 位置列表形状  shape = (None, 4, 2)
-    theOmega = keras.Input(shape=(1,)) # 设置Omega
 
     # buffer        #TODO layers.Dense()()
     buffer_state = layers.Dense(1, activation='relu')(done_buffer_list)  # dense ：全连接层  相当于添加一个层, inputs：输入该网络层的数据
