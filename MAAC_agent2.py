@@ -113,40 +113,41 @@ def agent_actor(input_dim_list, cnn_kernel_size, move_r):  # input_dim_list [(12
 # inputs: sensor_map, agent_map, bandwidth_vector;
 # outputs: bandwidth_vec
 def center_actor(input_dim_list, cnn_kernel_size):
-    #set input
+    # set input
     done_buffer_list = keras.Input(shape=input_dim_list[0])  # 缓冲区列表形状 shape = (None, 4, 2, 5)
-                                                             # 实例化一个keras张量,shape: 形状元组（整型）
+    # 实例化一个keras张量,shape: 形状元组（整型）
     pos_list = keras.Input(shape=input_dim_list[1])  # 位置列表形状  shape = (None, 4, 2)
-    theOmega = keras.Input(shape=(1,1)) # 设置Omega
+    theOmega = keras.Input(shape=(1, 1))  # 设置Omega
 
     # buffer        #TODO layers.Dense()()
     buffer_state = layers.Dense(1, activation='relu')(done_buffer_list)  # dense ：全连接层  相当于添加一个层, inputs：输入该网络层的数据
     buffer_state = tf.squeeze(buffer_state, axis=-1)  # 该函数返回一个张量，这个张量是将原始input中所有维度为1的那些维都删掉的结果,axis可以用来指定要删掉的为1的维度
-    
+
     # pos list
     pos = layers.Dense(2, activation='relu')(pos_list)
 
-    #theOmega process
+    # theOmega process
     Omega = layers.Dense(1, activation='relu')(theOmega)
     Omega = tf.squeeze(Omega, axis=-1)
 
     bandwidth_dense = layers.concatenate([buffer_state, pos], axis=-1)  # shape = (None, 4, 4)
-                                    # axis=n表示从第n个维度进行拼接，对于一个三维矩阵，axis的取值可以为[-3, -2, -1, 0, 1, 2]
+    # axis=n表示从第n个维度进行拼接，对于一个三维矩阵，axis的取值可以为[-3, -2, -1, 0, 1, 2]
     bandwidth_dense = layers.Dense(1, activation='relu')(bandwidth_dense)  # shape = (None, 4, 1)
     bandwidth_dense = tf.squeeze(bandwidth_dense, axis=-1)  # shape = (None, 4)
 
-    #connect it with omega
+    # connect it with omega
     mixWithOmega = layers.concatenate([bandwidth_dense, Omega], axis=-1)
 
-    #use MLP fuse the mixture
+    # use MLP fuse the mixture
     afterFuse = layers.Dense(9, activation='relu')(mixWithOmega)
 
-    #sepreate output
-    bandwidth_output = layers.Softmax()(afterFuse[:,:-1])
+    # sepreate output
+    bandwidth_output = layers.Softmax()(afterFuse[:, :-1])
     omegaOutput = afterFuse[0][-1]
 
-    #model = keras.Model(inputs=[done_buffer_list, pos_list], outputs=bandwidth_out2, name='center_actor_net')
-    model = keras.Model(inputs=[done_buffer_list, pos_list, theOmega], outputs=[bandwidth_output, omegaOutput], name='center_actor_net')
+    # model = keras.Model(inputs=[done_buffer_list, pos_list], outputs=bandwidth_out2, name='center_actor_net')
+    model = keras.Model(inputs=[done_buffer_list, pos_list, theOmega], outputs=[bandwidth_output, omegaOutput],
+                        name='center_actor_net')
 
     return model
 
@@ -301,10 +302,11 @@ def circle_argmax(move_dist, move_r):
     return max_pos[np.argmin(pos_dist)]
 
 
-class MAACAgent(object):
+class MAACAgent2(object):
 
     def __init__(self, env, tau, gamma, lr_aa, lr_ac, lr_ca, lr_cc, batch,
-                 epsilon=0.2, sample_method=1, theOmega=1):  # aa agent actor; ac agent critic; ca center actor; cc center critic
+                 epsilon=0.2, sample_method=1,
+                 theOmega=1):  # aa agent actor; ac agent critic; ca center actor; cc center critic
         self.env = env
         self.agents = self.env.agents
         self.agent_num = self.env.agent_num
@@ -339,13 +341,14 @@ class MAACAgent(object):
         self.center_memory = []
         self.sample_prop = 1 / 4
 
-        #FL params
+        # FL params
         self.theOmega = theOmega
 
         # 初始化网络 net init
         # 模型网络
         self.agent_actors = []  # 所有agent的actor网络
-        self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape], self.cnn_kernel_size)
+        self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape],
+                                         self.cnn_kernel_size)
         self.agent_critics = []  # 所有agent的critic网络
         self.center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape],
                                            self.cnn_kernel_size)
@@ -401,7 +404,7 @@ class MAACAgent(object):
         # 打印模型结果图
 
         print(self.center_actor.summary())
-        
+
         keras.utils.plot_model(self.center_actor, 'logs/model_figs/new_center_actor.png', show_shapes=True)
         keras.utils.plot_model(self.center_critic, 'logs/model_figs/new_center_critic.png', show_shapes=True)
         keras.utils.plot_model(self.agent_actors[0], 'logs/model_figs/new_agent_actor.png', show_shapes=True)
@@ -467,7 +470,8 @@ class MAACAgent(object):
             # print(done_buffer_list)
             pos_list = tf.expand_dims(pos_list, axis=0)
             band_vec = tf.expand_dims(band_vec, axis=0)  # TODO 这个有什么用
-            new_bandvec = self.center_actor.predict([done_buffer_list, pos_list, np.array([self.theOmega])])[0] #need to change here ---done-----------------------------
+            new_bandvec = self.center_actor.predict([done_buffer_list, pos_list, np.array([self.theOmega])])[
+                0]  # need to change here ---done-----------------------------
 
             # print('new_bandwidth{}'.format(new_bandvec[0]))
             """reward 和 经过预测后得到的结果"""
@@ -527,7 +531,6 @@ class MAACAgent(object):
         # # 单目标
         return new_rewards[-1]
 
-
     """经验重放过程,修改网络参数"""
 
     # @tf.function(experimental_relax_shapes=True)
@@ -573,7 +576,8 @@ class MAACAgent(object):
             # done = [sample[4] for sample in samples]
 
             """下一步的action 和 reward   next actions & rewards"""
-            new_actions = self.target_agent_actors[no].predict([new_state_map, new_total_data_state, new_done_data_state, new_band])
+            new_actions = self.target_agent_actors[no].predict(
+                [new_state_map, new_total_data_state, new_done_data_state, new_band])
             # new_move = np.array([self.move_dict[np.argmax(single_sample)] for single_sample in new_actions[0]])
             # print(new_actions[1].shape)
             q_future = self.target_agent_critics[no].predict(
@@ -583,8 +587,8 @@ class MAACAgent(object):
 
             """训练策略网络 train critic"""
             with tf.GradientTape() as tape:  # 根据某个函数的输入变量来计算它的导数,Tensorflow 会把 ‘tf.GradientTape’
-                                            #上下文中执行的所有操作都记录在一个磁带上 (“tape”)。 然后基于这个磁带和每次操作产生的导数，
-                                            #用反向微分法（“reverse mode differentiation”）来计算这些被“记录在案”的函数的导数。
+                # 上下文中执行的所有操作都记录在一个磁带上 (“tape”)。 然后基于这个磁带和每次操作产生的导数，
+                # 用反向微分法（“reverse mode differentiation”）来计算这些被“记录在案”的函数的导数。
                 # tape.watch(self.agent_critics[no].trainable_variables)
                 q_values = self.agent_critics[no](
                     [state_map, total_data_state, done_data_state, move, op_softmax, band])
@@ -640,12 +644,14 @@ class MAACAgent(object):
             new_done_buffer_list = np.vstack([sample[3][0] for sample in center_samples])
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
             """next actions & reward"""
-            new_c_actions = self.target_center_actor.predict([new_done_buffer_list, new_pos_list, np.array([self.theOmega]*self.batch_size)])[0]  #need to change here--done---------------------
+            new_c_actions = self.target_center_actor.predict(
+                [new_done_buffer_list, new_pos_list, np.array([self.theOmega] * self.batch_size)])[
+                0]  # need to change here--done---------------------
             cq_future = self.target_center_critic.predict([new_done_buffer_list, new_pos_list, new_c_actions])
             c_target_qs = c_reward + cq_future * self.gamma  # 目标reward，目标q值
             self.summaries['cq_val'] = np.average(c_reward[0])
 
-            print("***"*30)
+            print("***" * 30)
 
             """训练 center_critic 网络 train center critic"""
             with tf.GradientTape() as tape:
@@ -665,10 +671,11 @@ class MAACAgent(object):
                     print(type(each))
                     print(each.shape)
                 '''
-                
-                c_act, self.theOmega = self.center_actor([done_buffer_list, pos_list, np.array([[self.theOmega]])])  #need to change here------done-------------------------
+
+                c_act, self.theOmega = self.center_actor([done_buffer_list, pos_list, np.array(
+                    [[self.theOmega]])])  # need to change here------done-------------------------
                 ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list, c_act]))
-                
+
             # print(self.center_critic([sensor_maps, agent_maps, c_act]))
             ca_grad = tape.gradient(ca_loss, self.center_actor.trainable_variables)
             # print(ca_grad)
@@ -686,7 +693,6 @@ class MAACAgent(object):
             self.agent_critics[i].save('logs/models/{}/agent-critic-{}_episode{}.h5'.format(time_str, i, episode))
         self.center_actor.save('logs/models/{}/center-actor_episode{}.h5'.format(time_str, episode))
         self.center_critic.save('logs/models/{}/center-critic_episode{}.h5'.format(time_str, episode))
-
 
     """训练"""
 
