@@ -113,42 +113,63 @@ def agent_actor(input_dim_list, cnn_kernel_size, move_r):  # input_dim_list [(12
 # inputs: sensor_map, agent_map, bandwidth_vector;
 # outputs: bandwidth_vec
 def center_actor(input_dim_list, cnn_kernel_size):
-    # set input
+    #####set input#####
+    
     done_buffer_list = keras.Input(shape=input_dim_list[0])  # 缓冲区列表形状 shape = (None, 4, 2, 5)
     # 实例化一个keras张量,shape: 形状元组（整型）
     pos_list = keras.Input(shape=input_dim_list[1])  # 位置列表形状  shape = (None, 4, 2)
-    theOmega = keras.Input(shape=(1, 1))  # 设置Omega
+    state_map = keras.Input(shape=input_dim_list[3])  # State map input (121, 121, 2)
 
+    #####Part Bandwidth net#####
+    
     # buffer        #TODO layers.Dense()()
     buffer_state = layers.Dense(1, activation='relu')(done_buffer_list)  # dense ：全连接层  相当于添加一个层, inputs：输入该网络层的数据
     buffer_state = tf.squeeze(buffer_state, axis=-1)  # 该函数返回一个张量，这个张量是将原始input中所有维度为1的那些维都删掉的结果,axis可以用来指定要删掉的为1的维度
 
     # pos list
-    pos = layers.Dense(2, activation='relu')(pos_list)
-
-    # theOmega process
-    Omega = layers.Dense(1, activation='relu')(theOmega)
-    Omega = tf.squeeze(Omega, axis=-1)
-
+    pos = layers.Dense(2, activation='relu')(pos_list)   
+    
     bandwidth_dense = layers.concatenate([buffer_state, pos], axis=-1)  # shape = (None, 4, 4)
     # axis=n表示从第n个维度进行拼接，对于一个三维矩阵，axis的取值可以为[-3, -2, -1, 0, 1, 2]
     bandwidth_dense = layers.Dense(1, activation='relu')(bandwidth_dense)  # shape = (None, 4, 1)
     bandwidth_dense = tf.squeeze(bandwidth_dense, axis=-1)  # shape = (None, 4)
 
-    # connect it with omega
-    mixWithOmega = layers.concatenate([bandwidth_dense, Omega], axis=-1)
+    #Get bandwidth output via softmax
+    bandwidth_output = layers.Softmax()(bandwidth_dense)
 
-    # use MLP fuse the mixture
-    afterFuse = layers.Dense(input_dim_list[0][0]+1, activation='relu')(mixWithOmega)
+    #####Part Omega net#####
+    
+    #state map process
+    # map CNN
+    # merge last dim
+    map_cnn = layers.Dense(1, activation='relu')(state_map)
+    map_cnn = layers.Conv2D(1, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
+    map_cnn = layers.AveragePooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
+    map_cnn = layers.AlphaDropout(0.2)(map_cnn)
+    # map_cnn = layers.Conv2D(input_dim_list[0][2], kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
+    # map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size)(map_cnn)
+    # map_cnn = layers.Dropout(0.2)(map_cnn)
+    map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
 
-    # sepreate output
-    bandwidth_output = layers.Softmax()(afterFuse[:, :-1])
-    omegaOutput = tf.keras.activations.sigmoid(afterFuse[0][-1])
+    #ready bufferForOmega dense
+    bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
+    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
+    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    
+    #Concate bufferForOmega and mapCNN
+    mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+
+    #use MLPto fuse the mixture
+    afterFuse = layers.Dense(1, activation='relu')(mixture)
+    
+    #Get omega output, via sigmoid and mean
+    omegaOutput = tf.keras.activations.sigmoid(afterFuse)
+    omegaOutput = tf.reduce_mean(omegaOutput)
 
     # model = keras.Model(inputs=[done_buffer_list, pos_list], outputs=bandwidth_out2, name='center_actor_net')
-    model = keras.Model(inputs=[done_buffer_list, pos_list, theOmega], outputs=[bandwidth_output, omegaOutput],
-                        name='center_actor_net')
-
+    model = keras.Model(inputs=[done_buffer_list, pos_list, state_map],
+                        outputs=[bandwidth_output, omegaOutput], name='center_actor_net')
     return model
 
 
@@ -347,15 +368,15 @@ class MAACAgent2(object):
         # 初始化网络 net init
         # 模型网络
         self.agent_actors = []  # 所有agent的actor网络
-        self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape],
-                                         self.cnn_kernel_size)
+        self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
+                                          self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
         self.agent_critics = []  # 所有agent的critic网络
         self.center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape],
                                            self.cnn_kernel_size)
         # 目标网络
         self.target_agent_actors = []
-        self.target_center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape],
-                                                self.cnn_kernel_size)
+        self.target_center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
+                                                 self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
         update_target_net(self.center_actor, self.target_center_actor, tau=0)  # 最初tau=0
         self.target_agent_critics = []
         self.target_center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape],
@@ -364,8 +385,7 @@ class MAACAgent2(object):
         # TODO opt 是干什么的
         self.agent_actor_opt = []
         self.agent_critic_opt = []  # agent_critic 的操作，更新梯度
-        self.center_actor_opt = keras.optimizers.Adam(
-            learning_rate=lr_ca)  # learn rate center actor       # 优化器keras.optimizers.Adam()是解决这个问题的一个方案。其大概的思想是开始的学习率设置为一个较大的值，然后根据次数的增多，动态的减小学习率，以实现效率和效果的兼得。
+        self.center_actor_opt = keras.optimizers.Adam(learning_rate=lr_ca)  # learn rate center actor       # 优化器keras.optimizers.Adam()是解决这个问题的一个方案。其大概的思想是开始的学习率设置为一个较大的值，然后根据次数的增多，动态的减小学习率，以实现效率和效果的兼得。
         self.center_critic_opt = keras.optimizers.Adam(learning_rate=lr_cc)  # learn rate center critic
         # TODO
         self.summaries = {}
@@ -470,9 +490,9 @@ class MAACAgent2(object):
             # print(done_buffer_list)
             pos_list = tf.expand_dims(pos_list, axis=0)
             band_vec = tf.expand_dims(band_vec, axis=0)  # TODO 这个有什么用
-            new_bandvec = self.center_actor.predict([done_buffer_list, pos_list, np.array([self.theOmega])])[
-                0]  # need to change here ---done-----------------------------
-
+            compensateZeros = np.zeros([1] + list(self.state_map_shape))
+            new_bandvec = self.center_actor.predict([done_buffer_list,
+                                                     pos_list, compensateZeros])[0]  # need to change here -----done--------
             # print('new_bandwidth{}'.format(new_bandvec[0]))
             """reward 和 经过预测后得到的结果"""
 
@@ -645,7 +665,7 @@ class MAACAgent2(object):
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
             """next actions & reward"""
             new_c_actions = self.target_center_actor.predict(
-                [new_done_buffer_list, new_pos_list, np.array([self.theOmega] * self.batch_size)])[0]  # need to change here--done--------
+                [new_done_buffer_list, new_pos_list, state_map])[0]  # need to change here---done------
             cq_future = self.target_center_critic.predict([new_done_buffer_list, new_pos_list, new_c_actions])
 
             
@@ -665,19 +685,22 @@ class MAACAgent2(object):
             """训练 center_actor 网络 train center actor"""
             with tf.GradientTape() as tape:
                 tape.watch(self.center_actor.trainable_variables)
-                oemgaToInput = np.array([self.theOmega]*self.batch_size).reshape((self.batch_size,1))
                 c_act, self.theOmega = self.center_actor(
-                    [done_buffer_list, pos_list, oemgaToInput])  # need to change here------done---
+                    [done_buffer_list, pos_list, state_map])  # need to change here-----done--------
                 ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list, c_act]))
-
             # print(self.center_critic([sensor_maps, agent_maps, c_act]))
             ca_grad = tape.gradient(ca_loss, self.center_actor.trainable_variables)
             # print(ca_grad)
+            '''
+            WARNING:tensorflow:Gradients do not exist for variables
+            ['dense_3/kernel:0', 'dense_3/bias:0', 'conv2d/kernel:0', 'conv2d/bias:0', 'dense_4/kernel:0',
+            'dense_4/bias:0', 'dense_5/kernel:0', 'dense_5/bias:0', 'dense_6/kernel:0', 'dense_6/bias:0']
+            when minimizing the loss.
+            '''
             self.center_actor_opt.apply_gradients(zip(ca_grad, self.center_actor.trainable_variables))
             # print(ca_loss)
             self.summaries['center-critic_loss'] = cc_loss
             self.summaries['center-actor_loss'] = ca_loss
-
     # TODO:运行报错
     #  WARNING:tensorflow:Compiled the loaded model, but the compiled metrics have yet to be built. 已编译加载的模型，但尚未构建已编译的度量。
     #  `model.compile_metrics` will be empty until you train or evaluate the model.
