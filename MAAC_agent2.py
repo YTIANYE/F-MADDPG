@@ -118,7 +118,7 @@ def center_actor(input_dim_list, cnn_kernel_size):
     done_buffer_list = keras.Input(shape=input_dim_list[0])  # 缓冲区列表形状 shape = (None, 4, 2, 5)
     # 实例化一个keras张量,shape: 形状元组（整型）
     pos_list = keras.Input(shape=input_dim_list[1])  # 位置列表形状  shape = (None, 4, 2)
-    state_map = keras.Input(shape=input_dim_list[3])  # State map input (121, 121, 2)
+    state_map = keras.Input(shape=input_dim_list[3])  # State map input (None, 121, 121, 2)
 
     #####Part Bandwidth net#####
     
@@ -226,10 +226,15 @@ def agent_critic(input_dim_list, cnn_kernel_size):  # input_dim_list[(121, 121, 
 
 
 def center_critic(input_dim_list, cnn_kernel_size):
+    #####Set Input#####
     done_buffer_list = keras.Input(shape=input_dim_list[0])
     pos_list = keras.Input(shape=input_dim_list[1])
     bandwidth_vec = keras.Input(shape=input_dim_list[2])
+    state_map = keras.Input(shape=input_dim_list[3])  # State map input (121, 121, 2)
+    theOmega = keras.Input(shape=(1,))
 
+    #####Part Bandwidth net#####
+    
     # buffer        # TODO 为什么最后要变成 shape = [None, 4]
     buffer_state = layers.Dense(1, activation='relu')(done_buffer_list)  # shape = [None, 4, 2, 1]
     buffer_state = tf.squeeze(buffer_state, axis=-1)  # shape = [None, 4, 2]
@@ -243,43 +248,38 @@ def center_critic(input_dim_list, cnn_kernel_size):
     # bandvec
     # band_in = layers.Dense(2, activation='relu')(bandwidth_vec)
 
-    r_out = layers.concatenate(
-        [buffer_state, pos, bandwidth_vec])  # r_out shape = [None, 12]，参数三者的shape相同，shape = [None, 4]
+    #####Part Omega net#####
+    
+    #state map process
+    # map CNN
+    # merge last dim
+    map_cnn = layers.Dense(1, activation='relu')(state_map)
+    map_cnn = layers.Conv2D(1, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
+    map_cnn = layers.AveragePooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
+    map_cnn = layers.AlphaDropout(0.2)(map_cnn)
+    # map_cnn = layers.Conv2D(input_dim_list[0][2], kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
+    # map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size)(map_cnn)
+    # map_cnn = layers.Dropout(0.2)(map_cnn)
+    map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
+
+    #ready bufferForOmega dense
+    bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
+    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
+    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+
+    #Concate bufferForOmega and mapCNN
+    mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+    
+    #####Concatenate 2 part#####
+    
+    r_out = layers.concatenate([buffer_state, pos, bandwidth_vec, mixture, theOmega])  # r_out shape = [None, 12]，
+                                                                                        #参数三者的shape相同，shape = [None, 4]
     # r_out = layers.AlphaDropout(0.2)(r_out)
     r_out = layers.Dense(1, activation='relu')(r_out)  # r_out shape = [None, 1]
-    model = keras.Model(inputs=[done_buffer_list, pos_list, bandwidth_vec], outputs=r_out, name='center_critic_net')
-    # 以下代码原为注释
-    # sensor_map = keras.Input(shape=input_dim_list[0])
-    # agent_map = keras.Input(shape=input_dim_list[1])
-    # bandwidth_vec = keras.Input(shape=input_dim_list[2])
-    #
-    # # sensor map:cnn*2
-    # sensor_cnn = layers.Conv2D(input_dim_list[0][2], cnn_kernel_size, activation='relu', padding='same')(sensor_map)
-    # sensor_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size)(sensor_cnn)
-    # # sensor_cnn = layers.Dropout(0.2)(sensor_cnn)
-    # # sensor_cnn = layers.Conv2D(input_dim_list[0][2], cnn_kernel_size, activation='relu', padding='same')(sensor_cnn)
-    # # sensor_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size)(sensor_cnn)
-    # # sensor_cnn = layers.Dropout(0.2)(sensor_cnn)
-    # sensor_cnn = layers.Flatten()(sensor_cnn)
-    # sensor_cnn = layers.Dense(4, activation='relu')(sensor_cnn)
-    #
-    # # agent map
-    # agent_cnn = layers.Conv2D(input_dim_list[1][2], cnn_kernel_size, activation='relu', padding='same')(agent_map)
-    # agent_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size)(agent_cnn)
-    # # agent_cnn = layers.Dropout(0.2)(agent_cnn)
-    # # agent_cnn = layers.Conv2D(input_dim_list[1][2], cnn_kernel_size, activation='relu', padding='same')(agent_cnn)
-    # # agent_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size)(agent_cnn)
-    # # agent_cnn = layers.Dropout(0.2)(agent_cnn)
-    # agent_cnn = layers.Flatten()(agent_cnn)
-    # agent_cnn = layers.Dense(4, activation='relu')(agent_cnn)
-    #
-    # # add bandwidth
-    # bandwidth_out = layers.concatenate([sensor_cnn, agent_cnn, bandwidth_vec], axis=-1)
-    # bandwidth_out = layers.Dense(1, activation='relu')(bandwidth_out)
-    #
-    # model = keras.Model(inputs=[sensor_map, agent_map, bandwidth_vec], outputs=bandwidth_out, name='center_critic_net')
-    # # model.compile(loss=_huber_loss, optimizer=keras.optimizers.Adam(learning_rate=0.02))
-    # 以上代码原为注释
+    
+    model = keras.Model(inputs=[done_buffer_list, pos_list, bandwidth_vec, state_map, theOmega], outputs=r_out, name='center_critic_net')
+    
     return model
 
 
@@ -371,16 +371,16 @@ class MAACAgent2(object):
         self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
                                           self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
         self.agent_critics = []  # 所有agent的critic网络
-        self.center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape],
-                                           self.cnn_kernel_size)
+        self.center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape,
+                                            self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
         # 目标网络
         self.target_agent_actors = []
         self.target_center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
                                                  self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
         update_target_net(self.center_actor, self.target_center_actor, tau=0)  # 最初tau=0
         self.target_agent_critics = []
-        self.target_center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape, self.bandvec_shape],
-                                                  self.cnn_kernel_size)
+        self.target_center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape,
+                                                   self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
         update_target_net(self.center_critic, self.target_center_critic, tau=0)
         # TODO opt 是干什么的
         self.agent_actor_opt = []
@@ -439,6 +439,7 @@ class MAACAgent2(object):
             agent_act_list = []  # 所有agent 动作 列表（包含移动，执行，卸载）
             softmax_list = []  # softmax 列表（包含移动 和 对缓冲区的操作）
             cur_state_list = []
+            cur_state_map_list = []
             band_vec = np.zeros(self.agent_num)  # 带宽比例
             for i, agent in enumerate(self.agents):
                 # actor = self.agent_actors[i]
@@ -453,6 +454,7 @@ class MAACAgent2(object):
                 assemble_state = [state_map, total_data_state, done_data_state, band]  # 总状态
                 # print(['agent%s' % i, sum(sum(state_map))])
                 cur_state_list.append(assemble_state)
+                cur_state_map_list.append(state_map)
                 # print(total_data_state.shape)
                 # agent_actor 预测，根据预测进行操作（移动位置、执行、卸载、）
                 action_output = self.agent_actors[i].predict(assemble_state)
@@ -490,6 +492,7 @@ class MAACAgent2(object):
             # print(done_buffer_list)
             pos_list = tf.expand_dims(pos_list, axis=0)
             band_vec = tf.expand_dims(band_vec, axis=0)  # TODO 这个有什么用
+            #Believing stateMap have no effect on bandvec output, we use a compensateZeros to replace the stateMap
             compensateZeros = np.zeros([1] + list(self.state_map_shape))
             new_bandvec = self.center_actor.predict([done_buffer_list,
                                                      pos_list, compensateZeros])[0]  # need to change here -----done--------
@@ -504,18 +507,20 @@ class MAACAgent2(object):
             new_pos_list = tf.expand_dims(new_pos_list, axis=0)
 
             # edge agent 的经验池
+            new_state_map_list = []
             for i, agent in enumerate(self.agents):
                 # state_map = new_state_maps[i]  # 观察范围
                 # print(['agent%s' % i, sum(sum(state_map))])
                 # pos = agent.position
                 # total_data_state = agent.get_total_data()
                 # done_data_state = agent.get_done_data()  # 获取完成数据 shape = （2， 5）
-                state_map = tf.expand_dims(self.env.get_obs(agent), axis=0)  # 观察范围
+                state_map = tf.expand_dims(self.env.get_obs(agent), axis=0)  # 观察范围, shape is (1, 121, 121, 2)
                 # pos = tf.expand_dims(agent.position, axis=0)
                 total_data_state = tf.expand_dims(agent.get_total_data(), axis=0)  # 执行缓冲区全部数据 shape = （1， 2， 5）
                 done_data_state = tf.expand_dims(agent.get_done_data(), axis=0)  # 完成缓冲区数据 shape = （1， 2， 5）
                 band = tf.expand_dims(agent.action.bandwidth, axis=0)  # 带宽
                 new_states = [state_map, total_data_state, done_data_state, band]  # 新状态
+                new_state_map_list.append(state_map)
                 # agent 的缓冲区添加新状态
                 if agent.no in self.agent_memory.keys():
                     self.agent_memory[agent.no].append(
@@ -525,7 +530,11 @@ class MAACAgent2(object):
                         [cur_state_list[i], softmax_list[i], new_rewards[i], new_states, done[i]]]
             # 中心agent经验池
             self.center_memory.append(
-                [[done_buffer_list, pos_list], new_bandvec, new_rewards[-1], [new_done_buffer_list, new_pos_list]])
+                [[done_buffer_list, pos_list],
+                 new_bandvec, new_rewards[-1],
+                 [new_done_buffer_list, new_pos_list],
+                 cur_state_map_list, new_state_map_list,
+                 self.theOmega])   #need to change here-----done------
 
         else:
             # random action  随机执行动作
@@ -595,6 +604,14 @@ class MAACAgent2(object):
             # # done
             # done = [sample[4] for sample in samples]
 
+            '''
+            print("Debug in Ln 607")
+            print("#"*10)
+            for each in [new_state_map, new_total_data_state, new_done_data_state, new_band]:
+                print(np.array(each).shape)
+            print("#"*10)
+            '''
+            
             """下一步的action 和 reward   next actions & rewards"""
             new_actions = self.target_agent_actors[no].predict(
                 [new_state_map, new_total_data_state, new_done_data_state, new_band])
@@ -660,13 +677,24 @@ class MAACAgent2(object):
             pos_list = np.vstack([sample[0][1] for sample in center_samples])
             bandvec_act = np.vstack([sample[1] for sample in center_samples])
             c_reward = tf.expand_dims([sample[2] for sample in center_samples], axis=-1)
+            state_map = np.vstack([sample[4][0] for sample in center_samples])  #add state map for center critic net
+            omega_list = np.vstack([sample[6] for sample in center_samples])  #add omega
+
+            print(np.array(center_samples[0][4]).shape)
+            print("#*#"*30)
+            print(omega_list)
+            print("#*#"*30)
+            
             """new states"""
             new_done_buffer_list = np.vstack([sample[3][0] for sample in center_samples])
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
+            new_state_map = np.vstack([sample[5] for sample in center_samples])  #add new tate map for target center actor net
+            print(new_state_map.shape)
             """next actions & reward"""
-            new_c_actions = self.target_center_actor.predict(
-                [new_done_buffer_list, new_pos_list, state_map])[0]  # need to change here---done------
-            cq_future = self.target_center_critic.predict([new_done_buffer_list, new_pos_list, new_c_actions])
+            new_c_actions, newOmega = self.target_center_actor.predict(
+                [new_done_buffer_list, new_pos_list, new_state_map])  # need to change here-----done----------
+            cq_future = self.target_center_critic.predict([new_done_buffer_list,
+                                                           new_pos_list, new_c_actions, state_map, newOmega])
 
             
             c_target_qs = c_reward + cq_future * self.gamma  # 目标reward，目标q值
@@ -677,7 +705,7 @@ class MAACAgent2(object):
             """训练 center_critic 网络 train center critic"""
             with tf.GradientTape() as tape:
                 tape.watch(self.center_critic.trainable_variables)
-                cq_values = self.center_critic([done_buffer_list, pos_list, bandvec_act])
+                cq_values = self.center_critic([done_buffer_list, pos_list, bandvec_act, omega_list]) #need to change here-----------
                 cc_loss = tf.reduce_mean(tf.math.square(cq_values - tf.cast(c_target_qs, dtype=tf.float32)))
                 # cc_loss = tf.reduce_mean(tf.math.square(cq_values - c_target_qs))
             cc_grad = tape.gradient(cc_loss, self.center_critic.trainable_variables)
@@ -686,8 +714,8 @@ class MAACAgent2(object):
             with tf.GradientTape() as tape:
                 tape.watch(self.center_actor.trainable_variables)
                 c_act, self.theOmega = self.center_actor(
-                    [done_buffer_list, pos_list, state_map])  # need to change here-----done--------
-                ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list, c_act]))
+                    [done_buffer_list, pos_list, state_map])  # need to change here-------done---------
+                ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list, c_act])) # need to change here--------------
             # print(self.center_critic([sensor_maps, agent_maps, c_act]))
             ca_grad = tape.gradient(ca_loss, self.center_actor.trainable_variables)
             # print(ca_grad)

@@ -90,6 +90,7 @@ def experiment_5():
     """
     sensor_nums = [30]
     # sample_methods = [1, 2]  # 默认方式二 # 采样方式一 1；    采样方式二 2
+    # 现在用的采样方式是 1 
     sample_methods = [1]
     for sample in sample_methods:
         for i in range(len(sensor_nums)):

@@ -657,6 +657,7 @@ class MAACAgent(object):
 
             for each in [new_done_buffer_list, new_pos_list, new_c_actions]:
                 print(each.shape)
+                print("##"*10)
             
             cq_future = self.target_center_critic.predict([new_done_buffer_list, new_pos_list, new_c_actions])
 

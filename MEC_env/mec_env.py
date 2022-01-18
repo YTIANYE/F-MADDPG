@@ -190,9 +190,11 @@ class MEC_MARL_ENV(gym.Env):
         rd = [min(self.map_size, agent.position[0] + agent.obs_r + 1),
               max(0, agent.position[1] - agent.obs_r)]
 
-        # ob_map position
+        # ob_map position, 确定观察区域
+        # left up
         ob_lu = [agent.obs_r - agent.position[0] + lu[0],
                  agent.obs_r - agent.position[1] + lu[1]]
+        # right down
         ob_rd = [agent.obs_r + rd[0] - agent.position[0],
                  agent.obs_r + rd[1] - agent.position[1]]
         # print([lu, rd, ob_lu, ob_rd])
