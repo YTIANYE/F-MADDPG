@@ -143,14 +143,19 @@ def center_actor(input_dim_list, cnn_kernel_size):
     # map CNN
     # merge last dim
     map_cnn = layers.Dense(1, activation='relu')(state_map)
-    map_cnn = layers.Conv2D(1, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
-    map_cnn = layers.AveragePooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
-    map_cnn = layers.AlphaDropout(0.2)(map_cnn)
-    # map_cnn = layers.Conv2D(input_dim_list[0][2], kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
-    # map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size)(map_cnn)
-    # map_cnn = layers.Dropout(0.2)(map_cnn)
+    map_cnn = tf.squeeze(map_cnn, axis=-1)  # shape = [None, 4, 200, 200]
+    map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1])  #If it can work or not
+    #Conv1
+    map_cnn = layers.Conv2D(8, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
+    map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
+    #Conv2
+    map_cnn = layers.Conv2D(16, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
+    map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
+    #Flatten
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
-
+    #Dense to reshape map_cnn output
+    map_cnn = layers.Dense(8, activation='relu')(map_cnn)
+    
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
