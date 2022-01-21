@@ -47,7 +47,7 @@ def run(conditions):
     env = mec_env.MEC_MARL_ENV(mec_world, alpha=alpha, beta=beta, aggregate_reward=aggregate_reward)
     # 建立模型
     MAAC = MAAC_agent2.MAACAgent2(env, TAU, GAMMA, LR_A, LR_C, LR_A, LR_C, BATCH_SIZE, Epsilon,
-                                  sample_method, theOmega=FL_omega)
+                                  sample_method, theOmega=FL_omega, map_size)
 
     """训练开始"""
     # 记录环境参数

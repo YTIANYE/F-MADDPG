@@ -230,7 +230,7 @@ def center_critic(input_dim_list, cnn_kernel_size):
     done_buffer_list = keras.Input(shape=input_dim_list[0])
     pos_list = keras.Input(shape=input_dim_list[1])
     bandwidth_vec = keras.Input(shape=input_dim_list[2])
-    state_map = keras.Input(shape=input_dim_list[3])  # State map input (121, 121, 2)
+    state_map = keras.Input(shape=input_dim_list[3])  # State map input (4, 200, 200, 2)
     theOmega = keras.Input(shape=(1,))
 
     #####Part Bandwidth net#####
@@ -254,14 +254,19 @@ def center_critic(input_dim_list, cnn_kernel_size):
     # map CNN
     # merge last dim
     map_cnn = layers.Dense(1, activation='relu')(state_map)
-    map_cnn = layers.Conv2D(1, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
-    map_cnn = layers.AveragePooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
-    map_cnn = layers.AlphaDropout(0.2)(map_cnn)
-    # map_cnn = layers.Conv2D(input_dim_list[0][2], kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
-    # map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size)(map_cnn)
-    # map_cnn = layers.Dropout(0.2)(map_cnn)
+    map_cnn = tf.squeeze(map_cnn, axis=-1)  # shape = [None, 4, 200, 200]
+    map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1])  #If it can work or not
+    #Conv1
+    map_cnn = layers.Conv2D(8, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
+    map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
+    #Conv2
+    map_cnn = layers.Conv2D(16, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
+    map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
+    #Flatten
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
-
+    #Dense to reshape map_cnn output
+    map_cnn = layers.Dense(8, activation='relu')(map_cnn)
+    
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
@@ -326,14 +331,15 @@ def circle_argmax(move_dist, move_r):
 class MAACAgent2(object):
 
     def __init__(self, env, tau, gamma, lr_aa, lr_ac, lr_ca, lr_cc, batch,
-                 epsilon=0.2, sample_method=1,
-                 theOmega=1):  # aa agent actor; ac agent critic; ca center actor; cc center critic
+                 epsilon=0.2, sample_method=1, theOmega=1, , map_size):
+        # aa agent actor; ac agent critic; ca center actor; cc center critic
         self.env = env
         self.agents = self.env.agents
         self.agent_num = self.env.agent_num
         self.index_dim = 2  # 缓冲区索引（执行缓冲区和完成缓冲区）
         self.obs_r = self.env.obs_r  # 观察半径
         self.state_map_shape = (self.obs_r * 2 + 1, self.obs_r * 2 + 1, self.index_dim)  # 状态map的形状
+        self.all_agent_state_map_shape = (self.env.agent_num, map_size, map_size, 2)  #自定义的all_agent_state_map的形状
         self.pos_shape = (2)  # 位置 形状
         self.band_shape = (1)  # 带宽 形状
         self.buffstate_shape = (self.index_dim, self.env.max_buffer_size)  # 缓冲区(执行和完成)状态 形状
@@ -369,18 +375,18 @@ class MAACAgent2(object):
         # 模型网络
         self.agent_actors = []  # 所有agent的actor网络
         self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
-                                          self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
+                                          self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
         self.agent_critics = []  # 所有agent的critic网络
         self.center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape,
-                                            self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
+                                            self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
         # 目标网络
         self.target_agent_actors = []
         self.target_center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
-                                                 self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
+                                                 self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
         update_target_net(self.center_actor, self.target_center_actor, tau=0)  # 最初tau=0
         self.target_agent_critics = []
         self.target_center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape,
-                                                   self.bandvec_shape, self.state_map_shape], self.cnn_kernel_size)
+                                                   self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
         update_target_net(self.center_critic, self.target_center_critic, tau=0)
         # TODO opt 是干什么的
         self.agent_actor_opt = []
@@ -679,17 +685,10 @@ class MAACAgent2(object):
             c_reward = tf.expand_dims([sample[2] for sample in center_samples], axis=-1)
             state_map = np.vstack([sample[4][0] for sample in center_samples])  #add state map for center critic net
             omega_list = np.vstack([sample[6] for sample in center_samples])  #add omega
-
-            print(np.array(center_samples[0][4]).shape)
-            print("#*#"*30)
-            print(omega_list)
-            print("#*#"*30)
-            
             """new states"""
             new_done_buffer_list = np.vstack([sample[3][0] for sample in center_samples])
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
             new_state_map = np.vstack([sample[5] for sample in center_samples])  #add new tate map for target center actor net
-            print(new_state_map.shape)
             """next actions & reward"""
             new_c_actions, newOmega = self.target_center_actor.predict(
                 [new_done_buffer_list, new_pos_list, new_state_map])  # need to change here-----done----------
