@@ -144,7 +144,7 @@ def center_actor(input_dim_list, cnn_kernel_size):
     # merge last dim
     map_cnn = layers.Dense(1, activation='relu')(state_map)
     map_cnn = tf.squeeze(map_cnn, axis=-1)  # shape = [None, 4, 200, 200]
-    map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1])  #If it can work or not
+    map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1]) # shape = [None, 200, 200, 4]
     #Conv1
     map_cnn = layers.Conv2D(8, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
     map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
@@ -260,7 +260,7 @@ def center_critic(input_dim_list, cnn_kernel_size):
     # merge last dim
     map_cnn = layers.Dense(1, activation='relu')(state_map)
     map_cnn = tf.squeeze(map_cnn, axis=-1)  # shape = [None, 4, 200, 200]
-    map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1])  #If it can work or not
+    map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1])  # shape = [None, 200, 200, 4]
     #Conv1
     map_cnn = layers.Conv2D(8, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
     map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
@@ -335,8 +335,8 @@ def circle_argmax(move_dist, move_r):
 
 class MAACAgent2(object):
 
-    def __init__(self, env, tau, gamma, lr_aa, lr_ac, lr_ca, lr_cc, batch,
-                 epsilon=0.2, sample_method=1, theOmega=1, , map_size):
+    def __init__(self, env, tau, gamma, lr_aa, lr_ac, lr_ca, lr_cc, batch, map_size,
+                 epsilon=0.2, sample_method=1, theOmega=1):
         # aa agent actor; ac agent critic; ca center actor; cc center critic
         self.env = env
         self.agents = self.env.agents
