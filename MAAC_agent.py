@@ -654,7 +654,7 @@ class MAACAgent(object):
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
             """next actions & reward"""
             new_c_actions = self.target_center_actor.predict([new_done_buffer_list, new_pos_list])
-
+            
             for each in [new_done_buffer_list, new_pos_list, new_c_actions]:
                 print(each.shape)
                 print("##"*10)
