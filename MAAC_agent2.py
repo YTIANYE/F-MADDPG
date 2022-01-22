@@ -504,9 +504,9 @@ class MAACAgent2(object):
             pos_list = tf.expand_dims(pos_list, axis=0)
             band_vec = tf.expand_dims(band_vec, axis=0)  # TODO 这个有什么用
             #Believing stateMap have no effect on bandvec output, we use a compensateZeros to replace the stateMap
-            compensateZeros = np.zeros([1] + list(self.all_agent_state_map_shape))
-            new_bandvec = self.center_actor.predict([done_buffer_list,
-                                                     pos_list, compensateZeros])[0]  # need to change here -----done--------
+            new_bandvec, self.theOmega = self.center_actor.predict([done_buffer_list,
+                                                                    pos_list,
+                                                                    cur_state_map_list])  # need to change here -----done--------
             # print('new_bandwidth{}'.format(new_bandvec[0]))
             """reward 和 经过预测后得到的结果"""
 
@@ -613,15 +613,6 @@ class MAACAgent2(object):
             new_band = np.vstack([sample[3][3] for sample in samples])
             # # done
             # done = [sample[4] for sample in samples]
-
-            '''
-            print("Debug in Ln 607")
-            print("#"*10)
-            for each in [new_state_map, new_total_data_state, new_done_data_state, new_band]:
-                print(np.array(each).shape)
-            print("#"*10)
-            '''
-            
             """下一步的action 和 reward   next actions & rewards"""
             new_actions = self.target_agent_actors[no].predict(
                 [new_state_map, new_total_data_state, new_done_data_state, new_band])
@@ -697,24 +688,22 @@ class MAACAgent2(object):
             new_c_actions, new_omega = self.target_center_actor.predict(
                 [new_done_buffer_list, new_pos_list, new_state_map])  # need to change here--------done-------
 
-            print(new_omega)
-            self.theOmega = np.mean(new_omega)
+            
             #DEBUG
             print("###"*20)
+            print("DEBUG")
             print(new_c_actions.shape)
             print(new_state_map.shape)
+            print(new_omega)
             print(self.theOmega)
             print("###"*20)
             
             cq_future = self.target_center_critic.predict([new_done_buffer_list,
                                                            new_pos_list, new_c_actions,
-                                                           new_state_map, np.array([self.theOmega]*self.batch_size)])  # need to change here--------done-------
+                                                           new_state_map, new_omega])  # need to change here--------done-------
 
-            
             c_target_qs = c_reward + cq_future * self.gamma  # 目标reward，目标q值
             self.summaries['cq_val'] = np.average(c_reward[0])
-
-            print("***" * 30)
 
             """训练 center_critic 网络 train center critic"""
             with tf.GradientTape() as tape:
@@ -735,16 +724,14 @@ class MAACAgent2(object):
             # print(self.center_critic([sensor_maps, agent_maps, c_act]))
             ca_grad = tape.gradient(ca_loss, self.center_actor.trainable_variables)
             # print(ca_grad)
-            '''
-            WARNING:tensorflow:Gradients do not exist for variables
-            ['dense_3/kernel:0', 'dense_3/bias:0', 'conv2d/kernel:0', 'conv2d/bias:0', 'dense_4/kernel:0',
-            'dense_4/bias:0', 'dense_5/kernel:0', 'dense_5/bias:0', 'dense_6/kernel:0', 'dense_6/bias:0']
-            when minimizing the loss.
-            '''
             self.center_actor_opt.apply_gradients(zip(ca_grad, self.center_actor.trainable_variables))
             # print(ca_loss)
             self.summaries['center-critic_loss'] = cc_loss
             self.summaries['center-actor_loss'] = ca_loss
+
+            #Updage Omega via current Map info
+            #new_omega = self.target_center_actor.predict([cur_done_buffer_list, cur_pos_list, cur_state_map])
+            
     # TODO:运行报错
     #  WARNING:tensorflow:Compiled the loaded model, but the compiled metrics have yet to be built. 已编译加载的模型，但尚未构建已编译的度量。
     #  `model.compile_metrics` will be empty until you train or evaluate the model.
