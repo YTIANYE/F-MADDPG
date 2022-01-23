@@ -507,6 +507,11 @@ class MAACAgent2(object):
             new_bandvec, self.theOmega = self.center_actor.predict([done_buffer_list,
                                                                     pos_list,
                                                                     cur_state_map_list])  # need to change here -----done--------
+
+            with open("RecordTheOmega.txt", "a", encoding = "utf-8") as file:
+                file.write(str(float(self.theOmega)))
+                file.write("\n")
+
             # print('new_bandwidth{}'.format(new_bandvec[0]))
             """reward 和 经过预测后得到的结果"""
 
@@ -564,8 +569,10 @@ class MAACAgent2(object):
 
             """reward"""
             # 单目标
-
             new_state_maps, new_rewards, done, info = self.env.step(agent_act_list, new_bandvec)
+
+            #use random omege
+            self.theOmega = self.theOmega + random.uniform(-0.2,0.2)
 
         # # 单目标
         return new_rewards[-1]
@@ -687,17 +694,6 @@ class MAACAgent2(object):
             """next actions & reward"""
             new_c_actions, new_omega = self.target_center_actor.predict(
                 [new_done_buffer_list, new_pos_list, new_state_map])  # need to change here--------done-------
-
-            
-            #DEBUG
-            print("###"*20)
-            print("DEBUG")
-            print(new_c_actions.shape)
-            print(new_state_map.shape)
-            print(new_omega)
-            print(self.theOmega)
-            print("###"*20)
-            
             cq_future = self.target_center_critic.predict([new_done_buffer_list,
                                                            new_pos_list, new_c_actions,
                                                            new_state_map, new_omega])  # need to change here--------done-------
