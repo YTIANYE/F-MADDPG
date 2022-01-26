@@ -46,7 +46,8 @@ def run(conditions):
     mec_world = mec_def.MEC_world(map_size, agent_num, sensor_num, obs_r, speed, collect_r, max_size, sensor_lam)
     env = mec_env.MEC_MARL_ENV(mec_world, alpha=alpha, beta=beta, aggregate_reward=aggregate_reward)
     # 建立模型
-    MAAC = MAAC_agent2.MAACAgent2(env, TAU, GAMMA, LR_A, LR_C, LR_A, LR_C, BATCH_SIZE, Epsilon, sample_method, theOmega=FL_omega)
+    MAAC = MAAC_agent2.MAACAgent2(env, TAU, GAMMA, LR_A, LR_C, LR_A, LR_C, BATCH_SIZE,
+                                  map_size, Epsilon, sample_method, theOmega=FL_omega)
 
     """训练开始"""
     # 记录环境参数
@@ -90,6 +91,7 @@ def experiment_5():
     """
     sensor_nums = [30]
     # sample_methods = [1, 2]  # 默认方式二 # 采样方式一 1；    采样方式二 2
+    # 现在用的采样方式是 1 
     sample_methods = [1]
     for sample in sample_methods:
         for i in range(len(sensor_nums)):

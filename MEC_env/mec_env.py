@@ -190,9 +190,11 @@ class MEC_MARL_ENV(gym.Env):
         rd = [min(self.map_size, agent.position[0] + agent.obs_r + 1),
               max(0, agent.position[1] - agent.obs_r)]
 
-        # ob_map position
+        # ob_map position, 确定观察区域
+        # left up
         ob_lu = [agent.obs_r - agent.position[0] + lu[0],
                  agent.obs_r - agent.position[1] + lu[1]]
+        # right down
         ob_rd = [agent.obs_r + rd[0] - agent.position[0],
                  agent.obs_r + rd[1] - agent.position[1]]
         # print([lu, rd, ob_lu, ob_rd])
@@ -204,6 +206,35 @@ class MEC_MARL_ENV(gym.Env):
         agent.obs = obs
         # print(obs.shape)
         return obs
+
+    """get observation for a all agent"""
+
+    def get_obs_fullMap(self, agents):
+        # initial obs full map
+        fullMapShape = (self.agent_num, self.map_size, self.map_size, 2)
+        obs_fullMap = np.full(fullMapShape, -1)
+        for agentIndex in range(self.agent_num):
+            agent = agents[agentIndex]
+            # left up point
+            lu = [max(0, agent.position[0] - agent.obs_r),
+                  min(self.map_size, agent.position[1] + agent.obs_r + 1)]
+            # right down point
+            rd = [min(self.map_size, agent.position[0] + agent.obs_r + 1),
+                  max(0, agent.position[1] - agent.obs_r)]
+            # ob_map position, 确定观察区域
+            # left up
+            ob_lu = [agent.obs_r - agent.position[0] + lu[0],
+                     agent.obs_r - agent.position[1] + lu[1]]
+            # right down
+            ob_rd = [agent.obs_r + rd[0] - agent.position[0],
+                     agent.obs_r + rd[1] - agent.position[1]]
+            # print([lu, rd, ob_lu, ob_rd])
+            for i in range(ob_rd[1], ob_lu[1]):
+                map_i = rd[1] + i - ob_rd[1]
+                # print([i, map_i])
+                obs_fullMap[agentIndex][map_i][lu[0]:rd[0]] = self.DS_state[map_i][lu[0]:rd[0]]
+        return obs_fullMap    #shape is (4, 200, 200, 2)
+
 
     def get_statemap(self):
         sensor_map = np.ones([self.map_size, self.map_size, 2])
