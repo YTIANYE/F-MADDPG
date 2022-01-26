@@ -379,6 +379,7 @@ class MAACAgent2(object):
 
         # 初始化网络 net init
         # 模型网络
+        print("the shape is:", self.all_agent_state_map_shape)
         self.agent_actors = []  # 所有agent的actor网络
         self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
                                           self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
