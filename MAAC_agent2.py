@@ -15,6 +15,7 @@ import tqdm
 import json
 import math
 import platform
+import csv
 from print_logs import *
 from Params import *
 
@@ -755,6 +756,7 @@ class MAACAgent2(object):
         pos_list = tf.expand_dims(pos_list, axis=0)
         cur_state_map_list = np.expand_dims(self.env.get_obs_fullMap(self.agents), 0)
         self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1]  # need to change here -----done--------
+        self.theOmega = float(self.theOmega)
         print("Update theOmega as :", self.theOmega)
     
     # @tf.function
@@ -785,6 +787,13 @@ class MAACAgent2(object):
         while epoch < max_epochs:
             print("*"*100)
             print('epoch %s' % epoch)
+
+            file = open("EpochANDOmega.csv","a",newline = "", encoding = "utf-8")
+            writer = csv.writer(file)
+            print(type(self.theOmega))
+            writer.writerow([str(epoch), str(self.theOmega)])
+            file.close()
+            
             # if anomaly_edge and (epoch == anomaly_step):
             #     self.agents[anomaly_agent].movable = False
 
