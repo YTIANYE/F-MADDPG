@@ -18,6 +18,7 @@ import datetime
 from matplotlib import pyplot as plt
 import json
 import time
+import os
 
 FL = True  # 控制是否联合学习的开关，默认True
 
@@ -34,7 +35,7 @@ def run(conditions):
 
     # 选取GPU
     print("TensorFlow version: ", tf.__version__)
-    # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))  # 获得当前主机上特定运算设备的列表
     plt.rcParams['figure.figsize'] = (9, 9)  # 设置figure_size尺寸
     # logdir="logs/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -68,8 +69,7 @@ def run(conditions):
     print("开始时间:", time.localtime(startTime), file=f_print_logs)
 
     # 训练过程
-    MAAC.train(MAX_EPOCH, MAX_EP_STEPS, up_freq=up_freq, render=True, render_freq=render_freq, FL=FL,
-               FL_omega=FL_omega)
+    MAAC.train(FL_omega, MAX_EPOCH, MAX_EP_STEPS, up_freq=up_freq, render=True, render_freq=render_freq, FL=FL)
 
     # 统计执行时间
     endTime = time.time()

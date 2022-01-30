@@ -310,7 +310,7 @@ def update_target_net(model, target, tau=0.8):
 """联邦学习 根据其他agent的参数更新自己参数的过程"""
 
 
-def merge_fl(nets, omega=0.5):
+def merge_fl(nets, omega):
     for agent_no in range(len(nets)):
         target_params = nets[agent_no].get_weights()
         other_params = []
@@ -381,6 +381,7 @@ class MAACAgent2(object):
 
         # 初始化网络 net init
         # 模型网络
+        print("the shape is:", self.all_agent_state_map_shape)
         self.agent_actors = []  # 所有agent的actor网络
         self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
                                           self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
@@ -505,15 +506,21 @@ class MAACAgent2(object):
             # print(done_buffer_list)
             pos_list = tf.expand_dims(pos_list, axis=0)
             band_vec = tf.expand_dims(band_vec, axis=0)  # TODO 这个有什么用
-            #Believing stateMap have no effect on bandvec output, we use a compensateZeros to replace the stateMap
-            new_bandvec, self.theOmega = self.center_actor.predict([done_buffer_list,
+            new_bandvec = self.center_actor.predict([done_buffer_list,
                                                                     pos_list,
-                                                                    cur_state_map_list])  # need to change here -----done--------
+                                                                    cur_state_map_list])[0]  # need to change here -----done--------
 
+            '''
+            if self.theOmega == 0.5 and epoch < 170:
+                self.theOmega = self.theOmega + random.uniform(-0.1,0.1)
+                print("Chaned omega")
+            
+                
             with open("RecordTheOmega.txt", "a", encoding = "utf-8") as file:
                 file.write(str(float(self.theOmega)))
                 file.write("\n")
-
+            '''
+            
             # print('new_bandwidth{}'.format(new_bandvec[0]))
             """reward 和 经过预测后得到的结果"""
 
@@ -574,7 +581,7 @@ class MAACAgent2(object):
             new_state_maps, new_rewards, done, info = self.env.step(agent_act_list, new_bandvec)
 
             #use random omege
-            self.theOmega = self.theOmega + random.uniform(-0.2,0.2)
+            #self.theOmega = self.theOmega + random.uniform(-0.1,0.1)
 
         # # 单目标
         return new_rewards[-1]
@@ -745,8 +752,18 @@ class MAACAgent2(object):
 
     """训练"""
 
+    def updateTheOmega(self):
+        # 中心agent动作     center act
+        done_buffer_list, pos_list = self.env.get_center_state()  # 获取边缘agent位置以及卸载缓冲区数据大小和年龄
+        done_buffer_list = tf.expand_dims(done_buffer_list, axis=0)
+        # print(done_buffer_list)
+        pos_list = tf.expand_dims(pos_list, axis=0)
+        cur_state_map_list = np.expand_dims(self.env.get_obs_fullMap(self.agents), 0)
+        self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1]  # need to change here -----done--------
+        print("Update theOmega as :", self.theOmega)
+    
     # @tf.function
-    def train(self, max_epochs=2000, max_step=500, up_freq=8, render=False, render_freq=1, FL=False, FL_omega=0.5,
+    def train(self, FL_omega, max_epochs=2000, max_step=500, up_freq=8, render=False, render_freq=1, FL=False,
               anomaly_edge=False):
         """初始化变量"""
         cur_time = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
@@ -771,6 +788,7 @@ class MAACAgent2(object):
 
         """训练过程"""
         while epoch < max_epochs:
+            print("*"*100)
             print('epoch %s' % epoch)
             # if anomaly_edge and (epoch == anomaly_step):
             #     self.agents[anomaly_agent].movable = False
@@ -806,7 +824,6 @@ class MAACAgent2(object):
             """执行action"""
             # 单目标
             cur_reward = self.actor_act(epoch)  # 获取当前reward
-
             """记录reward"""
             step_reward.append(cur_reward)
             print('epoch:%s cur_reward:%f' % (epoch, cur_reward))
@@ -826,6 +843,7 @@ class MAACAgent2(object):
             """联合学习参数更新 以及 目标网络权重参数更新 update target"""
             if epoch % up_freq == 1:
                 print('update targets, finished data: {}'.format(len(self.env.world.finished_data)))
+                self.updateTheOmega()
 
                 # finish_length.append(len(self.env.world.finished_data))
                 if FL:  # 联合学习更新网络参数
