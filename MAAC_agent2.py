@@ -155,22 +155,24 @@ def center_actor(input_dim_list, cnn_kernel_size):
     #Flatten
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
     #Dense to reshape map_cnn output
-    map_cnn = layers.Dense(8, activation='relu')(map_cnn)
+    map_cnn = layers.Dense(8, activation='sigmoid')(map_cnn)
     
     #ready bufferForOmega dense
-    bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
+    bufferForOmega = layers.Dense(1, activation='sigmoid')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
-    bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
+    bufferForOmega = layers.Dense(1, activation='sigmoid')(bufferForOmega)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     
     #Concate bufferForOmega and mapCNN
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
 
     #use MLPto fuse the mixture
-    afterFuse = layers.Dense(1, activation='relu')(mixture)
+    afterFuse = layers.Dense(1, activation='sigmoid')(mixture)
     
     #Get omega output, via sigmoid and mean
-    omegaOutput = tf.keras.activations.sigmoid(afterFuse)
+    #omegaOutput = tf.keras.activations.sigmoid(afterFuse)
+    omegaOutput = afterFuse
+    
     omegaOutput = tf.squeeze(omegaOutput, axis=-1)
     #omegaOutput = tf.reduce_mean(omegaOutput)
 
