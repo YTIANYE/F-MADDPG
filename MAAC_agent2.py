@@ -15,6 +15,7 @@ import tqdm
 import json
 import math
 import platform
+import csv
 from print_logs import *
 from Params import *
 
@@ -134,10 +135,8 @@ def center_actor(input_dim_list, cnn_kernel_size):
     bandwidth_dense = layers.Dense(1, activation='relu')(bandwidth_dense)  # shape = (None, 4, 1)
     bandwidth_dense = tf.squeeze(bandwidth_dense, axis=-1)  # shape = (None, 4)
 
-
     #Get bandwidth output via softmax
     bandwidth_output = layers.Softmax()(bandwidth_dense)
-
 
     #####Part Omega net#####
     
@@ -168,16 +167,18 @@ def center_actor(input_dim_list, cnn_kernel_size):
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
 
     #use MLPto fuse the mixture
-    afterFuse = layers.Dense(1, activation='relu')(mixture)
+    afterFuse1 = layers.Dense(64, activation='relu')(mixture)
+    afterFuse2 = layers.Dense(16, activation='relu')(afterFuse1)
+    afterFuse3 = layers.Dense(1, activation='relu')(afterFuse2)
     
     #Get omega output, via sigmoid and mean
-    omegaOutput = tf.keras.activations.sigmoid(afterFuse)
+    omegaOutput = tf.keras.activations.sigmoid(afterFuse3)
     omegaOutput = tf.squeeze(omegaOutput, axis=-1)
     #omegaOutput = tf.reduce_mean(omegaOutput)
 
     # model = keras.Model(inputs=[done_buffer_list, pos_list], outputs=bandwidth_out2, name='center_actor_net')
     model = keras.Model(inputs=[done_buffer_list, pos_list, state_map],
-                        outputs=[bandwidth_output, omegaOutput], name='center_actor_net')
+                        outputs=[bandwidth_output, omegaOutput, afterFuse3], name='center_actor_net')
     return model
 
 
@@ -701,13 +702,11 @@ class MAACAgent2(object):
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
             new_state_map = np.vstack([sample[5] for sample in center_samples])  #add new tate map for target center actor net
             """next actions & reward"""
-
-            new_c_actions, new_omega = self.target_center_actor.predict(
+            new_c_actions, new_omega, toRecord = self.target_center_actor.predict(
                 [new_done_buffer_list, new_pos_list, new_state_map])  # need to change here--------done-------
             cq_future = self.target_center_critic.predict([new_done_buffer_list,
                                                            new_pos_list, new_c_actions,
                                                            new_state_map, new_omega])  # need to change here--------done-------
-
 
             c_target_qs = c_reward + cq_future * self.gamma  # 目标reward，目标q值
             self.summaries['cq_val'] = np.average(c_reward[0])
@@ -724,11 +723,10 @@ class MAACAgent2(object):
             """训练 center_actor 网络 train center actor"""
             with tf.GradientTape() as tape:
                 tape.watch(self.center_actor.trainable_variables)
-                c_act, trainOmega = self.center_actor(
+                c_act, trainOmega, toRecord = self.center_actor(
                     [done_buffer_list, pos_list, state_map])  # need to change here------done----------
                 ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list,
                                                              c_act, state_map, trainOmega])) # need to change here-------done-------
-
             # print(self.center_critic([sensor_maps, agent_maps, c_act]))
             ca_grad = tape.gradient(ca_loss, self.center_actor.trainable_variables)
             # print(ca_grad)
@@ -759,8 +757,11 @@ class MAACAgent2(object):
         # print(done_buffer_list)
         pos_list = tf.expand_dims(pos_list, axis=0)
         cur_state_map_list = np.expand_dims(self.env.get_obs_fullMap(self.agents), 0)
-        self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1]  # need to change here -----done--------
+        self.theOmega, toRecord = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1:]  # need to change here -----done--------
+        self.theOmega = float(self.theOmega)
         print("Update theOmega as :", self.theOmega)
+        print("To record is:", toRecord)
+        return toRecord
     
     # @tf.function
     def train(self, FL_omega, max_epochs=2000, max_step=500, up_freq=8, render=False, render_freq=1, FL=False,
@@ -786,16 +787,23 @@ class MAACAgent2(object):
         anomaly_step = 6000
         anomaly_agent = self.agent_num - 1
 
+        beforeOmega = 0
+        
         """训练过程"""
         while epoch < max_epochs:
             print("*"*100)
             print('epoch %s' % epoch)
+           
+            # if epoch > 3000:
+            #     break
+
             # if anomaly_edge and (epoch == anomaly_step):
             #     self.agents[anomaly_agent].movable = False
 
             """每20个epoch保存一次环境map"""
             if render and (epoch % 20 == 1):
-                self.env.render(env_log_dir, epoch, True)
+                pass
+                #self.env.render(env_log_dir, epoch, True)
                 # sensor_states.append(self.env.DS_state)
 
             """经过max_step后， 结束一个episode，更新经验池，重新开始"""
@@ -827,11 +835,10 @@ class MAACAgent2(object):
             """记录reward"""
             step_reward.append(cur_reward)
             print('epoch:%s cur_reward:%f' % (epoch, cur_reward))
-            print("Current omega:", self.theOmega)
             # 打印控制台日志
             f_print_logs = PRINT_LOGS(cur_time).open()
             print('epoch:%s reward:%f' % (epoch, cur_reward), file=f_print_logs)
-            print('epoch:%s Current omega::%f' % (epoch, self.theOmega), file=f_print_logs)
+            print("Current omega:", self.theOmega)
             f_print_logs.close()
 
             """经验重放"""
@@ -843,7 +850,7 @@ class MAACAgent2(object):
             """联合学习参数更新 以及 目标网络权重参数更新 update target"""
             if epoch % up_freq == 1:
                 print('update targets, finished data: {}'.format(len(self.env.world.finished_data)))
-                self.updateTheOmega()
+                beforeOmega = self.updateTheOmega()
 
                 # finish_length.append(len(self.env.world.finished_data))
                 if FL:  # 联合学习更新网络参数
@@ -880,6 +887,13 @@ class MAACAgent2(object):
 
             summary_writer.flush()
 
+            file = open("EpochANDOmegaANDBeforeOmega.csv","a",newline = "", encoding = "utf-8")
+            writer = csv.writer(file)
+            print(type(self.theOmega))
+            writer.writerow([str(epoch), str(self.theOmega), str(float(beforeOmega))])
+            file.close()
+            
+
         """save final model"""
         self.save_model(episode, cur_time)
         sio.savemat(record_dir + '/data.mat',
@@ -891,7 +905,7 @@ class MAACAgent2(object):
                      })
 
         """画出环境map gif"""
-        self.env.render(env_log_dir, epoch, True)
+        #self.env.render(env_log_dir, epoch, True)
         img_paths = glob.glob(env_log_dir + '/*.png')
         # linux(/)和windows(\)文件路径斜杠不同，注意区分
         system = platform.system()  # 获取操作系统类型
