@@ -35,7 +35,7 @@ def run(conditions):
 
     # 选取GPU
     print("TensorFlow version: ", tf.__version__)
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))  # 获得当前主机上特定运算设备的列表
     plt.rcParams['figure.figsize'] = (9, 9)  # 设置figure_size尺寸
     # logdir="logs/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")

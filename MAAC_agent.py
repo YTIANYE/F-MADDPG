@@ -661,7 +661,7 @@ class MAACAgent(object):
             
             cq_future = self.target_center_critic.predict([new_done_buffer_list, new_pos_list, new_c_actions])
 
-            quit()
+            # quit()
             
             c_target_qs = c_reward + cq_future * self.gamma  # 目标reward，目标q值
             self.summaries['cq_val'] = np.average(c_reward[0])
@@ -745,7 +745,7 @@ class MAACAgent(object):
         """训练过程"""
         while epoch < max_epochs:
             # 调试用
-            if epoch == 100:
+            if epoch == 159:
                 print("debug断点")
             print('epoch %s' % epoch)
             # if anomaly_edge and (epoch == anomaly_step):

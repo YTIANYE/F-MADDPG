@@ -115,70 +115,70 @@ def agent_actor(input_dim_list, cnn_kernel_size, move_r):  # input_dim_list [(12
 # outputs: bandwidth_vec
 def center_actor(input_dim_list, cnn_kernel_size):
     #####set input#####
-    
+
     done_buffer_list = keras.Input(shape=input_dim_list[0])  # 缓冲区列表形状 shape = (None, 4, 2, 5)
     # 实例化一个keras张量,shape: 形状元组（整型）
     pos_list = keras.Input(shape=input_dim_list[1])  # 位置列表形状  shape = (None, 4, 2)
     state_map = keras.Input(shape=input_dim_list[3])  # State map input (None, 121, 121, 2)
 
     #####Part Bandwidth net#####
-    
+
     # buffer        #TODO layers.Dense()()
     buffer_state = layers.Dense(1, activation='relu')(done_buffer_list)  # dense ：全连接层  相当于添加一个层, inputs：输入该网络层的数据
     buffer_state = tf.squeeze(buffer_state, axis=-1)  # 该函数返回一个张量，这个张量是将原始input中所有维度为1的那些维都删掉的结果,axis可以用来指定要删掉的为1的维度
 
     # pos list
-    pos = layers.Dense(2, activation='relu')(pos_list)   
-    
+    pos = layers.Dense(2, activation='relu')(pos_list)
+
     bandwidth_dense = layers.concatenate([buffer_state, pos], axis=-1)  # shape = (None, 4, 4)
     # axis=n表示从第n个维度进行拼接，对于一个三维矩阵，axis的取值可以为[-3, -2, -1, 0, 1, 2]
     bandwidth_dense = layers.Dense(1, activation='relu')(bandwidth_dense)  # shape = (None, 4, 1)
     bandwidth_dense = tf.squeeze(bandwidth_dense, axis=-1)  # shape = (None, 4)
 
-    #Get bandwidth output via softmax
+    # Get bandwidth output via softmax
     bandwidth_output = layers.Softmax()(bandwidth_dense)
 
     #####Part Omega net#####
-    
-    #state map process
+
+    # state map process
     # map CNN
     # merge last dim
     map_cnn = layers.Dense(1, activation='relu')(state_map)
     map_cnn = tf.squeeze(map_cnn, axis=-1)  # shape = [None, 4, 200, 200]
-    map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1]) # shape = [None, 200, 200, 4]
-    #Conv1
+    map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1])  # shape = [None, 200, 200, 4]
+    # Conv1
     map_cnn = layers.Conv2D(8, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
     map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
-    #Conv2
+    # Conv2
     map_cnn = layers.Conv2D(16, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
     map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
-    #Flatten
+    # Flatten
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
-    #Dense to reshape map_cnn output
-    map_cnn = layers.Dense(8, activation='relu')(map_cnn)
-    
-    #ready bufferForOmega dense
-    bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
+    # Dense to reshape map_cnn output
+    map_cnn = layers.Dense(8, activation='sigmoid')(map_cnn)
+
+    # ready bufferForOmega dense
+    bufferForOmega = layers.Dense(1, activation='sigmoid')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
-    bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
+    bufferForOmega = layers.Dense(1, activation='sigmoid')(bufferForOmega)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
-    
-    #Concate bufferForOmega and mapCNN
+
+    # Concate bufferForOmega and mapCNN
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
 
-    #use MLPto fuse the mixture
-    afterFuse1 = layers.Dense(64, activation='relu')(mixture)
-    afterFuse2 = layers.Dense(16, activation='relu')(afterFuse1)
-    afterFuse3 = layers.Dense(1, activation='relu')(afterFuse2)
-    
-    #Get omega output, via sigmoid and mean
-    omegaOutput = tf.keras.activations.sigmoid(afterFuse3)
+    # use MLPto fuse the mixture
+    afterFuse = layers.Dense(1, activation='sigmoid')(mixture)
+
+    # Get omega output, via sigmoid and mean
+    # omegaOutput = tf.keras.activations.sigmoid(afterFuse)
+    omegaOutput = afterFuse
+
     omegaOutput = tf.squeeze(omegaOutput, axis=-1)
-    #omegaOutput = tf.reduce_mean(omegaOutput)
+    # omegaOutput = tf.reduce_mean(omegaOutput)
 
     # model = keras.Model(inputs=[done_buffer_list, pos_list], outputs=bandwidth_out2, name='center_actor_net')
     model = keras.Model(inputs=[done_buffer_list, pos_list, state_map],
-                        outputs=[bandwidth_output, omegaOutput, afterFuse3], name='center_actor_net')
+                        outputs=[bandwidth_output, omegaOutput], name='center_actor_net')
     return model
 
 
@@ -243,7 +243,7 @@ def center_critic(input_dim_list, cnn_kernel_size):
     theOmega = keras.Input(shape=(1,))
 
     #####Part Bandwidth net#####
-    
+
     # buffer        # TODO 为什么最后要变成 shape = [None, 4]
     buffer_state = layers.Dense(1, activation='relu')(done_buffer_list)  # shape = [None, 4, 2, 1]
     buffer_state = tf.squeeze(buffer_state, axis=-1)  # shape = [None, 4, 2]
@@ -258,42 +258,43 @@ def center_critic(input_dim_list, cnn_kernel_size):
     # band_in = layers.Dense(2, activation='relu')(bandwidth_vec)
 
     #####Part Omega net#####
-    
-    #state map process
+
+    # state map process
     # map CNN
     # merge last dim
     map_cnn = layers.Dense(1, activation='relu')(state_map)
     map_cnn = tf.squeeze(map_cnn, axis=-1)  # shape = [None, 4, 200, 200]
     map_cnn = tf.transpose(map_cnn, [0, 2, 3, 1])  # shape = [None, 200, 200, 4]
-    #Conv1
+    # Conv1
     map_cnn = layers.Conv2D(8, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
     map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
-    #Conv2
+    # Conv2
     map_cnn = layers.Conv2D(16, kernel_size=cnn_kernel_size, activation='relu', padding='same')(map_cnn)
     map_cnn = layers.MaxPooling2D(pool_size=cnn_kernel_size * 2)(map_cnn)
-    #Flatten
+    # Flatten
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
-    #Dense to reshape map_cnn output
+    # Dense to reshape map_cnn output
     map_cnn = layers.Dense(8, activation='relu')(map_cnn)
-    
-    #ready bufferForOmega dense
+
+    # ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
 
-    #Concate bufferForOmega and mapCNN
+    # Concate bufferForOmega and mapCNN
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
-    
+
     #####Concatenate 2 part#####
-    
+
     r_out = layers.concatenate([buffer_state, pos, bandwidth_vec, mixture, theOmega])  # r_out shape = [None, 12]，
-                                                                                        #参数三者的shape相同，shape = [None, 4]
+    # 参数三者的shape相同，shape = [None, 4]
     # r_out = layers.AlphaDropout(0.2)(r_out)
     r_out = layers.Dense(1, activation='relu')(r_out)  # r_out shape = [None, 1]
-    
-    model = keras.Model(inputs=[done_buffer_list, pos_list, bandwidth_vec, state_map, theOmega], outputs=r_out, name='center_critic_net')
-    
+
+    model = keras.Model(inputs=[done_buffer_list, pos_list, bandwidth_vec, state_map, theOmega], outputs=r_out,
+                        name='center_critic_net')
+
     return model
 
 
@@ -348,7 +349,7 @@ class MAACAgent2(object):
         self.index_dim = 2  # 缓冲区索引（执行缓冲区和完成缓冲区）
         self.obs_r = self.env.obs_r  # 观察半径
         self.state_map_shape = (self.obs_r * 2 + 1, self.obs_r * 2 + 1, self.index_dim)  # 状态map的形状
-        self.all_agent_state_map_shape = (self.env.agent_num, map_size, map_size, 2)  #自定义的all_agent_state_map的形状
+        self.all_agent_state_map_shape = (self.env.agent_num, map_size, map_size, 2)  # 自定义的all_agent_state_map的形状
         self.pos_shape = (2)  # 位置 形状
         self.band_shape = (1)  # 带宽 形状
         self.buffstate_shape = (self.index_dim, self.env.max_buffer_size)  # 缓冲区(执行和完成)状态 形状
@@ -392,16 +393,19 @@ class MAACAgent2(object):
         # 目标网络
         self.target_agent_actors = []
         self.target_center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
-                                                 self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
+                                                 self.bandvec_shape, self.all_agent_state_map_shape],
+                                                self.cnn_kernel_size)
         update_target_net(self.center_actor, self.target_center_actor, tau=0)  # 最初tau=0
         self.target_agent_critics = []
         self.target_center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape,
-                                                   self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
+                                                   self.bandvec_shape, self.all_agent_state_map_shape],
+                                                  self.cnn_kernel_size)
         update_target_net(self.center_critic, self.target_center_critic, tau=0)
         # TODO opt 是干什么的
         self.agent_actor_opt = []
         self.agent_critic_opt = []  # agent_critic 的操作，更新梯度
-        self.center_actor_opt = keras.optimizers.Adam(learning_rate=lr_ca)  # learn rate center actor       # 优化器keras.optimizers.Adam()是解决这个问题的一个方案。其大概的思想是开始的学习率设置为一个较大的值，然后根据次数的增多，动态的减小学习率，以实现效率和效果的兼得。
+        self.center_actor_opt = keras.optimizers.Adam(
+            learning_rate=lr_ca)  # learn rate center actor       # 优化器keras.optimizers.Adam()是解决这个问题的一个方案。其大概的思想是开始的学习率设置为一个较大的值，然后根据次数的增多，动态的减小学习率，以实现效率和效果的兼得。
         self.center_critic_opt = keras.optimizers.Adam(learning_rate=lr_cc)  # learn rate center critic
         # TODO
         self.summaries = {}
@@ -508,20 +512,20 @@ class MAACAgent2(object):
             pos_list = tf.expand_dims(pos_list, axis=0)
             band_vec = tf.expand_dims(band_vec, axis=0)  # TODO 这个有什么用
             new_bandvec = self.center_actor.predict([done_buffer_list,
-                                                                    pos_list,
-                                                                    cur_state_map_list])[0]  # need to change here -----done--------
+                                                     pos_list,
+                                                     cur_state_map_list])[0]  # need to change here -----done--------
 
             '''
             if self.theOmega == 0.5 and epoch < 170:
                 self.theOmega = self.theOmega + random.uniform(-0.1,0.1)
                 print("Chaned omega")
-            
-                
+
+
             with open("RecordTheOmega.txt", "a", encoding = "utf-8") as file:
                 file.write(str(float(self.theOmega)))
                 file.write("\n")
             '''
-            
+
             # print('new_bandwidth{}'.format(new_bandvec[0]))
             """reward 和 经过预测后得到的结果"""
 
@@ -559,7 +563,7 @@ class MAACAgent2(object):
                  new_bandvec, new_rewards[-1],
                  [new_done_buffer_list, new_pos_list],
                  cur_state_map_list, new_state_map_list,
-                 self.theOmega])   #need to change here-----done------
+                 self.theOmega])  # need to change here-----done------
 
         else:
             # random action  随机执行动作
@@ -581,8 +585,8 @@ class MAACAgent2(object):
             # 单目标
             new_state_maps, new_rewards, done, info = self.env.step(agent_act_list, new_bandvec)
 
-            #use random omege
-            #self.theOmega = self.theOmega + random.uniform(-0.1,0.1)
+            # use random omege
+            # self.theOmega = self.theOmega + random.uniform(-0.1,0.1)
 
         # # 单目标
         return new_rewards[-1]
@@ -617,7 +621,7 @@ class MAACAgent2(object):
             total_data_state = np.vstack([sample[0][1] for sample in samples])
             done_data_state = np.vstack([sample[0][2] for sample in samples])
             band = np.vstack([sample[0][3] for sample in samples])
-            # action    
+            # action
             move = np.vstack([sample[1][0] for sample in samples])
             op_softmax = np.vstack([sample[1][1] for sample in samples])
             # reward
@@ -695,18 +699,20 @@ class MAACAgent2(object):
             pos_list = np.vstack([sample[0][1] for sample in center_samples])
             bandvec_act = np.vstack([sample[1] for sample in center_samples])
             c_reward = tf.expand_dims([sample[2] for sample in center_samples], axis=-1)
-            state_map = np.vstack([sample[4] for sample in center_samples])  #add state map for center critic net
-            omega_list = np.vstack([sample[6] for sample in center_samples])  #add omega
+            state_map = np.vstack([sample[4] for sample in center_samples])  # add state map for center critic net
+            omega_list = np.vstack([sample[6] for sample in center_samples])  # add omega
             """new states"""
             new_done_buffer_list = np.vstack([sample[3][0] for sample in center_samples])
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
-            new_state_map = np.vstack([sample[5] for sample in center_samples])  #add new tate map for target center actor net
+            new_state_map = np.vstack(
+                [sample[5] for sample in center_samples])  # add new tate map for target center actor net
             """next actions & reward"""
-            new_c_actions, new_omega, toRecord = self.target_center_actor.predict(
+            new_c_actions, new_omega = self.target_center_actor.predict(
                 [new_done_buffer_list, new_pos_list, new_state_map])  # need to change here--------done-------
             cq_future = self.target_center_critic.predict([new_done_buffer_list,
                                                            new_pos_list, new_c_actions,
-                                                           new_state_map, new_omega])  # need to change here--------done-------
+                                                           new_state_map,
+                                                           new_omega])  # need to change here--------done-------
 
             c_target_qs = c_reward + cq_future * self.gamma  # 目标reward，目标q值
             self.summaries['cq_val'] = np.average(c_reward[0])
@@ -715,7 +721,7 @@ class MAACAgent2(object):
             with tf.GradientTape() as tape:
                 tape.watch(self.center_critic.trainable_variables)
                 cq_values = self.center_critic([done_buffer_list, pos_list, bandvec_act,
-                                                state_map, omega_list]) #need to change here-----done------
+                                                state_map, omega_list])  # need to change here-----done------
                 cc_loss = tf.reduce_mean(tf.math.square(cq_values - tf.cast(c_target_qs, dtype=tf.float32)))
                 # cc_loss = tf.reduce_mean(tf.math.square(cq_values - c_target_qs))
             cc_grad = tape.gradient(cc_loss, self.center_critic.trainable_variables)
@@ -723,10 +729,11 @@ class MAACAgent2(object):
             """训练 center_actor 网络 train center actor"""
             with tf.GradientTape() as tape:
                 tape.watch(self.center_actor.trainable_variables)
-                c_act, trainOmega, toRecord = self.center_actor(
+                c_act, trainOmega = self.center_actor(
                     [done_buffer_list, pos_list, state_map])  # need to change here------done----------
                 ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list,
-                                                             c_act, state_map, trainOmega])) # need to change here-------done-------
+                                                             c_act, state_map,
+                                                             trainOmega]))  # need to change here-------done-------
             # print(self.center_critic([sensor_maps, agent_maps, c_act]))
             ca_grad = tape.gradient(ca_loss, self.center_actor.trainable_variables)
             # print(ca_grad)
@@ -735,9 +742,9 @@ class MAACAgent2(object):
             self.summaries['center-critic_loss'] = cc_loss
             self.summaries['center-actor_loss'] = ca_loss
 
-            #Updage Omega via current Map info
-            #new_omega = self.target_center_actor.predict([cur_done_buffer_list, cur_pos_list, cur_state_map])
-            
+            # Updage Omega via current Map info
+            # new_omega = self.target_center_actor.predict([cur_done_buffer_list, cur_pos_list, cur_state_map])
+
     # TODO:运行报错
     #  WARNING:tensorflow:Compiled the loaded model, but the compiled metrics have yet to be built. 已编译加载的模型，但尚未构建已编译的度量。
     #  `model.compile_metrics` will be empty until you train or evaluate the model.
@@ -757,12 +764,11 @@ class MAACAgent2(object):
         # print(done_buffer_list)
         pos_list = tf.expand_dims(pos_list, axis=0)
         cur_state_map_list = np.expand_dims(self.env.get_obs_fullMap(self.agents), 0)
-        self.theOmega, toRecord = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1:]  # need to change here -----done--------
+        self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[
+            1]  # need to change here -----done--------
         self.theOmega = float(self.theOmega)
         print("Update theOmega as :", self.theOmega)
-        print("To record is:", toRecord)
-        return toRecord
-    
+
     # @tf.function
     def train(self, FL_omega, max_epochs=2000, max_step=500, up_freq=8, render=False, render_freq=1, FL=False,
               anomaly_edge=False):
@@ -787,23 +793,23 @@ class MAACAgent2(object):
         anomaly_step = 6000
         anomaly_agent = self.agent_num - 1
 
-        beforeOmega = 0
-        
         """训练过程"""
         while epoch < max_epochs:
-            print("*"*100)
+            print("*" * 100)
             print('epoch %s' % epoch)
-           
-            # if epoch > 3000:
-            #     break
+
+            file = open("EpochANDOmega.csv", "a", newline="", encoding="utf-8")
+            writer = csv.writer(file)
+            print(type(self.theOmega))
+            writer.writerow([str(epoch), str(self.theOmega)])
+            file.close()
 
             # if anomaly_edge and (epoch == anomaly_step):
             #     self.agents[anomaly_agent].movable = False
 
             """每20个epoch保存一次环境map"""
             if render and (epoch % 20 == 1):
-                pass
-                #self.env.render(env_log_dir, epoch, True)
+                self.env.render(env_log_dir, epoch, True)
                 # sensor_states.append(self.env.DS_state)
 
             """经过max_step后， 结束一个episode，更新经验池，重新开始"""
@@ -850,7 +856,7 @@ class MAACAgent2(object):
             """联合学习参数更新 以及 目标网络权重参数更新 update target"""
             if epoch % up_freq == 1:
                 print('update targets, finished data: {}'.format(len(self.env.world.finished_data)))
-                beforeOmega = self.updateTheOmega()
+                self.updateTheOmega()
 
                 # finish_length.append(len(self.env.world.finished_data))
                 if FL:  # 联合学习更新网络参数
@@ -884,15 +890,9 @@ class MAACAgent2(object):
                                           self.summaries['agent%s-critic_loss' % acount], step=epoch)
                 # tf.summary.scalar('Main/step_average_age', cur_reward, step=epoch)
                 tf.summary.scalar('Main/step_reward', cur_reward, step=epoch)
+                tf.summary.scalar('Main/omega', self.theOmega, step=epoch)
 
             summary_writer.flush()
-
-            file = open("EpochANDOmegaANDBeforeOmega.csv","a",newline = "", encoding = "utf-8")
-            writer = csv.writer(file)
-            print(type(self.theOmega))
-            writer.writerow([str(epoch), str(self.theOmega), str(float(beforeOmega))])
-            file.close()
-            
 
         """save final model"""
         self.save_model(episode, cur_time)
@@ -902,10 +902,11 @@ class MAACAgent2(object):
                      'ages': sensor_ages,
                      'step_reward': step_reward,
                      'episode_reward': episode_reward,
+                     'omega':self.theOmega,
                      })
 
         """画出环境map gif"""
-        #self.env.render(env_log_dir, epoch, True)
+        self.env.render(env_log_dir, epoch, True)
         img_paths = glob.glob(env_log_dir + '/*.png')
         # linux(/)和windows(\)文件路径斜杠不同，注意区分
         system = platform.system()  # 获取操作系统类型
