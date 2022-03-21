@@ -120,6 +120,7 @@ def center_actor(input_dim_list, cnn_kernel_size):
     # 实例化一个keras张量,shape: 形状元组（整型）
     pos_list = keras.Input(shape=input_dim_list[1])  # 位置列表形状  shape = (None, 4, 2)
     state_map = keras.Input(shape=input_dim_list[3])  # State map input (None, 121, 121, 2)
+    elementNumber = input_dim_list[0][0]   #the number of UAV agent
 
     #####Part Bandwidth net#####
     
@@ -167,18 +168,15 @@ def center_actor(input_dim_list, cnn_kernel_size):
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
 
     #use MLPto fuse the mixture
-    afterFuse = layers.Dense(1, activation='sigmoid')(mixture)
+    afterFuse = layers.Dense(elementNumber**2, activation='sigmoid')(mixture)
     
-    #Get omega output, via sigmoid and mean
-    #omegaOutput = tf.keras.activations.sigmoid(afterFuse)
-    omegaOutput = afterFuse
-    
-    omegaOutput = tf.squeeze(omegaOutput, axis=-1)
-    #omegaOutput = tf.reduce_mean(omegaOutput)
+    #generate omegaMatrix via softmax
+    matrixShape = tf.reshape(afterFuse,(-1, elementNumber, elementNumber))   #shape: (None, 4, 4)
+    softmaxResult = tf.nn.softmax(matrixShape, axis=-2)
 
     # model = keras.Model(inputs=[done_buffer_list, pos_list], outputs=bandwidth_out2, name='center_actor_net')
     model = keras.Model(inputs=[done_buffer_list, pos_list, state_map],
-                        outputs=[bandwidth_output, omegaOutput], name='center_actor_net')
+                        outputs=[bandwidth_output, softmaxResult], name='center_actor_net')
     return model
 
 
@@ -240,7 +238,8 @@ def center_critic(input_dim_list, cnn_kernel_size):
     pos_list = keras.Input(shape=input_dim_list[1])
     bandwidth_vec = keras.Input(shape=input_dim_list[2])
     state_map = keras.Input(shape=input_dim_list[3])  # State map input (4, 200, 200, 2)
-    theOmega = keras.Input(shape=(1,))
+    elementNumber = input_dim_list[0][0]   #the number of UAV agent
+    theOmega = keras.Input(shape=(elementNumber, elementNumber))
 
     #####Part Bandwidth net#####
     
@@ -286,13 +285,15 @@ def center_critic(input_dim_list, cnn_kernel_size):
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
     
     #####Concatenate 2 part#####
+    theOmegaReshaped = tf.reshape(theOmega, (-1, elementNumber**2))   #shape: (None, 16)
     
-    r_out = layers.concatenate([buffer_state, pos, bandwidth_vec, mixture, theOmega])  # r_out shape = [None, 12]，
-                                                                                        #参数三者的shape相同，shape = [None, 4]
-    # r_out = layers.AlphaDropout(0.2)(r_out)
+    r_out = layers.concatenate([buffer_state, pos, bandwidth_vec, mixture, theOmegaReshaped])
+                                    # r_out shape = [None, 27]，
+                                    #参数三者的shape相同，shape = [None, 4]
     r_out = layers.Dense(1, activation='relu')(r_out)  # r_out shape = [None, 1]
     
-    model = keras.Model(inputs=[done_buffer_list, pos_list, bandwidth_vec, state_map, theOmega], outputs=r_out, name='center_critic_net')
+    model = keras.Model(inputs=[done_buffer_list, pos_list, bandwidth_vec,
+                                state_map, theOmega], outputs=r_out, name='center_critic_net')
     
     return model
 
@@ -439,7 +440,8 @@ class MAACAgent2(object):
 
         # 打印模型结果图
 
-        print(self.center_actor.summary())
+        print(self.center_critic.summary())
+        exit()
 
         keras.utils.plot_model(self.center_actor, 'logs/model_figs/new_center_actor.png', show_shapes=True)
         keras.utils.plot_model(self.center_critic, 'logs/model_figs/new_center_critic.png', show_shapes=True)
@@ -789,12 +791,6 @@ class MAACAgent2(object):
         while epoch < max_epochs:
             print("*"*100)
             print('epoch %s' % epoch)
-
-            file = open("EpochANDOmega.csv","a",newline = "", encoding = "utf-8")
-            writer = csv.writer(file)
-            print(type(self.theOmega))
-            writer.writerow([str(epoch), str(self.theOmega)])
-            file.close()
             
             # if anomaly_edge and (epoch == anomaly_step):
             #     self.agents[anomaly_agent].movable = False
