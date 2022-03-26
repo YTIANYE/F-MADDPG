@@ -311,20 +311,13 @@ def update_target_net(model, target, tau=0.8):
 
 """联邦学习 根据其他agent的参数更新自己参数的过程"""
 
-
 def merge_fl(nets, omega):
-    for agent_no in range(len(nets)):
-        target_params = nets[agent_no].get_weights()
-        other_params = []
-        for i, net in enumerate(nets):
-            if i == agent_no:
-                continue
-            other_params.append(net.get_weights())
-        for i in range(len(target_params)):
-            others = np.sum([w[i] for w in other_params], axis=0) / len(other_params)
-            target_params[i] = omega * target_params[i] + others * (1 - omega)
-            # print([others.shape, target_params[i].shape])
-        nets[agent_no].set_weights(target_params)
+    weightMatrix = np.array([nets[agent_no].get_weights() for agent_no in range(len(nets))] ).T   #shape:(14, 4)
+    newWeightMatrix = np.matmul(weightMatrix, omega)
+    newWeightMatrix = newWeightMatrix.T    #shape is: (4,14)
+    for eachUAV in range(newWeightMatrix.shape[0]):
+        nets[eachUAV].set_weights(newWeightMatrix[eachUAV])
+
 
 
 """选定移动位置"""
@@ -440,8 +433,7 @@ class MAACAgent2(object):
 
         # 打印模型结果图
 
-        print(self.center_critic.summary())
-        exit()
+        print(self.center_actor.summary())
 
         keras.utils.plot_model(self.center_actor, 'logs/model_figs/new_center_actor.png', show_shapes=True)
         keras.utils.plot_model(self.center_critic, 'logs/model_figs/new_center_critic.png', show_shapes=True)
@@ -582,9 +574,6 @@ class MAACAgent2(object):
             """reward"""
             # 单目标
             new_state_maps, new_rewards, done, info = self.env.step(agent_act_list, new_bandvec)
-
-            #use random omege
-            #self.theOmega = self.theOmega + random.uniform(-0.1,0.1)
 
         # # 单目标
         return new_rewards[-1]
@@ -760,7 +749,7 @@ class MAACAgent2(object):
         pos_list = tf.expand_dims(pos_list, axis=0)
         cur_state_map_list = np.expand_dims(self.env.get_obs_fullMap(self.agents), 0)
         self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1]  # need to change here -----done--------
-        self.theOmega = float(self.theOmega)
+        self.theOmega = np.array(self.theOmega[0])
         print("Update theOmega as :", self.theOmega)
     
     # @tf.function
