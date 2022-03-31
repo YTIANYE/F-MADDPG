@@ -157,16 +157,19 @@ def center_actor(input_dim_list, cnn_kernel_size):
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
     #Dense to reshape map_cnn output
     map_cnn = layers.Dense(8, activation='relu')(map_cnn)
-    
+
+    '''
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    '''
     
     #Concate bufferForOmega and mapCNN
-    mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
-
+    #mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+    mixture = map_cnn
+    
     #use MLPto fuse the mixture
     afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture)
     
@@ -274,15 +277,18 @@ def center_critic(input_dim_list, cnn_kernel_size):
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
     #Dense to reshape map_cnn output
     map_cnn = layers.Dense(8, activation='relu')(map_cnn)
-    
+
+    '''
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    '''
 
     #Concate bufferForOmega and mapCNN
-    mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+    #mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+    mixture = map_cnn
     
     #####Concatenate 2 part#####
     theOmegaReshaped = tf.reshape(theOmega, (-1, elementNumber**2))   #shape: (None, 16)
