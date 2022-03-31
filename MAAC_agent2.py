@@ -156,19 +156,19 @@ def center_actor(input_dim_list, cnn_kernel_size):
     #Flatten
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
     #Dense to reshape map_cnn output
-    map_cnn = layers.Dense(8, activation='sigmoid')(map_cnn)
+    map_cnn = layers.Dense(8, activation='relu')(map_cnn)
     
     #ready bufferForOmega dense
-    bufferForOmega = layers.Dense(1, activation='sigmoid')(done_buffer_list)
+    bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
-    bufferForOmega = layers.Dense(1, activation='sigmoid')(bufferForOmega)
+    bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     
     #Concate bufferForOmega and mapCNN
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
 
     #use MLPto fuse the mixture
-    afterFuse = layers.Dense(elementNumber**2, activation='sigmoid')(mixture)
+    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture)
     
     #generate omegaMatrix via softmax
     matrixShape = tf.reshape(afterFuse,(-1, elementNumber, elementNumber))   #shape: (None, 4, 4)
@@ -750,6 +750,7 @@ class MAACAgent2(object):
         cur_state_map_list = np.expand_dims(self.env.get_obs_fullMap(self.agents), 0)
         self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1]  # need to change here -----done--------
         self.theOmega = np.array(self.theOmega[0])
+        self.theOmega = np.around(self.theOmega, 3)
         print("Update theOmega as :", self.theOmega)
     
     # @tf.function
@@ -820,7 +821,7 @@ class MAACAgent2(object):
             print('epoch:%s cur_reward:%f' % (epoch, cur_reward))
             # 打印控制台日志
             f_print_logs = PRINT_LOGS(cur_time).open()
-            print('epoch:%s reward:%f' % (epoch, cur_reward), file=f_print_logs)
+            print('epoch:%s reward:%f, Current omega: \n %s' % (epoch, cur_reward, self.theOmega), file=f_print_logs)
             print("Current omega:", self.theOmega)
             f_print_logs.close()
 
@@ -830,10 +831,12 @@ class MAACAgent2(object):
             finish_size.append(sum([data[0] for data in self.env.world.finished_data]))  # 完成 量
             sensor_ages.append(list(self.env.world.sensor_age.values()))
 
+            if epoch % 2 == 1:
+                self.updateTheOmega()
+
             """联合学习参数更新 以及 目标网络权重参数更新 update target"""
             if epoch % up_freq == 1:
                 print('update targets, finished data: {}'.format(len(self.env.world.finished_data)))
-                self.updateTheOmega()
 
                 # finish_length.append(len(self.env.world.finished_data))
                 if FL:  # 联合学习更新网络参数
