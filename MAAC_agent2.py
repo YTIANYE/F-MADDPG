@@ -156,7 +156,7 @@ def center_actor(input_dim_list, cnn_kernel_size):
     #Flatten
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
     #Dense to reshape map_cnn output
-    map_cnn = layers.Dense(8, activation='relu')(map_cnn)
+    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn)
 
     '''
     #ready bufferForOmega dense
@@ -179,7 +179,7 @@ def center_actor(input_dim_list, cnn_kernel_size):
 
     # model = keras.Model(inputs=[done_buffer_list, pos_list], outputs=bandwidth_out2, name='center_actor_net')
     model = keras.Model(inputs=[done_buffer_list, pos_list, state_map],
-                        outputs=[bandwidth_output, softmaxResult], name='center_actor_net')
+                        outputs=[bandwidth_output, softmaxResult, matrixShape], name='center_actor_net')
     return model
 
 
@@ -276,7 +276,7 @@ def center_critic(input_dim_list, cnn_kernel_size):
     #Flatten
     map_cnn = layers.Flatten()(map_cnn)  # Flatten层用来将输入“压平”，即把多维的输入一维化，常用在从卷积层到全连接层的过渡。
     #Dense to reshape map_cnn output
-    map_cnn = layers.Dense(8, activation='relu')(map_cnn)
+    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn)
 
     '''
     #ready bufferForOmega dense
@@ -699,7 +699,7 @@ class MAACAgent2(object):
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
             new_state_map = np.vstack([sample[5] for sample in center_samples])  #add new tate map for target center actor net
             """next actions & reward"""
-            new_c_actions, new_omega = self.target_center_actor.predict(
+            new_c_actions, new_omega, new_preOmega = self.target_center_actor.predict(
                 [new_done_buffer_list, new_pos_list, new_state_map])  # need to change here--------done-------
             cq_future = self.target_center_critic.predict([new_done_buffer_list,
                                                            new_pos_list, new_c_actions,
@@ -720,7 +720,7 @@ class MAACAgent2(object):
             """训练 center_actor 网络 train center actor"""
             with tf.GradientTape() as tape:
                 tape.watch(self.center_actor.trainable_variables)
-                c_act, trainOmega = self.center_actor(
+                c_act, trainOmega, preOmega = self.center_actor(
                     [done_buffer_list, pos_list, state_map])  # need to change here------done----------
                 ca_loss = tf.reduce_mean(self.center_critic([done_buffer_list, pos_list,
                                                              c_act, state_map, trainOmega])) # need to change here-------done-------
@@ -757,7 +757,9 @@ class MAACAgent2(object):
         self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1]  # need to change here -----done--------
         self.theOmega = np.array(self.theOmega[0])
         self.theOmega = np.around(self.theOmega, 3)
-        print("Update theOmega as :", self.theOmega)
+        preOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[2]
+        print("Update theOmega as : \n", self.theOmega)
+        print("What before omega is: \n", preOmega)
     
     # @tf.function
     def train(self, FL_omega, max_epochs=2000, max_step=500, up_freq=8, render=False, render_freq=1, FL=False,
@@ -793,7 +795,8 @@ class MAACAgent2(object):
 
             """每20个epoch保存一次环境map"""
             if render and (epoch % 20 == 1):
-                self.env.render(env_log_dir, epoch, True)
+                pass
+                #self.env.render(env_log_dir, epoch, True)
                 # sensor_states.append(self.env.DS_state)
 
             """经过max_step后， 结束一个episode，更新经验池，重新开始"""
@@ -890,7 +893,7 @@ class MAACAgent2(object):
                      })
 
         """画出环境map gif"""
-        self.env.render(env_log_dir, epoch, True)
+        #self.env.render(env_log_dir, epoch, True)
         img_paths = glob.glob(env_log_dir + '/*.png')
         # linux(/)和windows(\)文件路径斜杠不同，注意区分
         system = platform.system()  # 获取操作系统类型
