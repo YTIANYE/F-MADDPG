@@ -171,7 +171,8 @@ def center_actor(input_dim_list, cnn_kernel_size):
     mixture = map_cnn
     
     #use MLPto fuse the mixture
-    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture)
+    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture) + 1
+    afterFuse = layers.Dense(elementNumber**2, activation='relu')(afterFuse) +1
     
     #generate omegaMatrix via softmax
     matrixShape = tf.reshape(afterFuse,(-1, elementNumber, elementNumber))   #shape: (None, 4, 4)
@@ -296,6 +297,8 @@ def center_critic(input_dim_list, cnn_kernel_size):
     r_out = layers.concatenate([buffer_state, pos, bandwidth_vec, mixture, theOmegaReshaped])
                                     # r_out shape = [None, 27]，
                                     #参数三者的shape相同，shape = [None, 4]
+    r_out = layers.Dense(32, activation='relu')(r_out)
+    r_out = layers.Dense(8, activation='relu')(r_out)
     r_out = layers.Dense(1, activation='relu')(r_out)  # r_out shape = [None, 1]
     
     model = keras.Model(inputs=[done_buffer_list, pos_list, bandwidth_vec,
