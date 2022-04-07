@@ -158,17 +158,15 @@ def center_actor(input_dim_list, cnn_kernel_size):
     #Dense to reshape map_cnn output
     map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn)
 
-    '''
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
-    '''
     
     #Concate bufferForOmega and mapCNN
-    #mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
-    mixture = map_cnn
+    mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+    #mixture = map_cnn
     
     #use MLPto fuse the mixture
     afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture) + 1
@@ -279,17 +277,15 @@ def center_critic(input_dim_list, cnn_kernel_size):
     #Dense to reshape map_cnn output
     map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn)
 
-    '''
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
-    '''
 
     #Concate bufferForOmega and mapCNN
-    #mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
-    mixture = map_cnn
+    mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+    #mixture = map_cnn
     
     #####Concatenate 2 part#####
     theOmegaReshaped = tf.reshape(theOmega, (-1, elementNumber**2))   #shape: (None, 16)
