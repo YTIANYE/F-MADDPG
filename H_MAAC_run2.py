@@ -11,6 +11,7 @@ import MAAC_agent
 from print_logs import *
 from Params import *
 
+import os
 import tensorflow as tf
 from tensorflow import keras
 import tensorboard
@@ -26,15 +27,15 @@ FL = True  # 控制是否联合学习的开关，默认True
 
 
 def run(conditions):
-    sensor_num = conditions["sensor_num"]
-    sample_method = conditions["sample_method"]
+    #sensor_num = conditions["sensor_num"]
+    sample_method = 1
     np.random.seed(map_seed)
     random.seed(map_seed)
     tf.random.set_seed(rand_seed)
 
     # 选取GPU
     print("TensorFlow version: ", tf.__version__)
-    # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))  # 获得当前主机上特定运算设备的列表
     plt.rcParams['figure.figsize'] = (9, 9)  # 设置figure_size尺寸
     # logdir="logs/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -53,7 +54,7 @@ def run(conditions):
     # 记录环境参数
     m_time = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     f = open('logs/hyperparam/%s.json' % m_time, 'w')
-    params["conditions"] = conditions
+    #params["conditions"] = conditions
     json.dump(params, f)
     f.close()
 
@@ -88,16 +89,15 @@ def experiment_5():
     """
     变量：数据源个数
     """
-    sensor_nums = [30]
     # sample_methods = [1, 2]  # 默认方式二 # 采样方式一 1；    采样方式二 2
     # 现在用的采样方式是 1 
-    sample_methods = [1]
-    for sample in sample_methods:
-        for i in range(len(sensor_nums)):
-            conditions = {'sensor_num': sensor_nums[i], 'sample_method': sample}
-            print("sensor_num:", sensor_nums[i])
+    for i in range(5):
+        conditions = params
+        print("Condition is ", params)
+        try:
             run(conditions)
-
+        except:
+            pass
 
 def H_MAAC_run2():
     print("运行程序：H_MAAC_run2")

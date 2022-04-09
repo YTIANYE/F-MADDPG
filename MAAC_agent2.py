@@ -158,24 +158,22 @@ def center_actor(input_dim_list, cnn_kernel_size):
     #Dense to reshape map_cnn output
     map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn)
 
-    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn) + 1
-    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn) +1
-
+    '''
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
-    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1) + 1
+    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    '''
     
     #Concate bufferForOmega and mapCNN
-    mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
-
-    print(mixture.shape)
-    #mixture = map_cnn
+    #mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+    mixture = map_cnn
     
-    #use MLPto fuse the mixture 
-    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture)
-
+    #use MLPto fuse the mixture
+    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture) + 1
+    afterFuse = layers.Dense(elementNumber**2, activation='relu')(afterFuse) +1
+    
     #generate omegaMatrix via softmax
     matrixShape = tf.reshape(afterFuse,(-1, elementNumber, elementNumber))   #shape: (None, 4, 4)
     softmaxResult = tf.nn.softmax(matrixShape, axis=-2)
@@ -281,18 +279,17 @@ def center_critic(input_dim_list, cnn_kernel_size):
     #Dense to reshape map_cnn output
     map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn)
 
-    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn) + 1
-    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn) +1
-
+    '''
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
-    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1) + 1 
+    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    '''
 
     #Concate bufferForOmega and mapCNN
-    mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
-    #mixture = map_cnn
+    #mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+    mixture = map_cnn
     
     #####Concatenate 2 part#####
     theOmegaReshaped = tf.reshape(theOmega, (-1, elementNumber**2))   #shape: (None, 16)
@@ -837,7 +834,7 @@ class MAACAgent2(object):
             # 打印控制台日志
             f_print_logs = PRINT_LOGS(cur_time).open()
             print('epoch:%s reward:%f, Current omega: \n %s' % (epoch, cur_reward, self.theOmega), file=f_print_logs)
-            print("Current omega:", self.theOmega)
+            print("Current omega: \n", self.theOmega)
             f_print_logs.close()
 
             """经验重放"""
