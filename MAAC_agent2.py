@@ -158,20 +158,24 @@ def center_actor(input_dim_list, cnn_kernel_size):
     #Dense to reshape map_cnn output
     map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn)
 
+    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn) + 1
+    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn) +1
+
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
-    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1) + 1
     
     #Concate bufferForOmega and mapCNN
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
+
+    print(mixture.shape)
     #mixture = map_cnn
     
-    #use MLPto fuse the mixture
-    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture) + 1
-    afterFuse = layers.Dense(elementNumber**2, activation='relu')(afterFuse) +1
-    
+    #use MLPto fuse the mixture 
+    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture)
+
     #generate omegaMatrix via softmax
     matrixShape = tf.reshape(afterFuse,(-1, elementNumber, elementNumber))   #shape: (None, 4, 4)
     softmaxResult = tf.nn.softmax(matrixShape, axis=-2)
@@ -277,11 +281,14 @@ def center_critic(input_dim_list, cnn_kernel_size):
     #Dense to reshape map_cnn output
     map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn)
 
+    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn) + 1
+    map_cnn = layers.Dense(elementNumber**2, activation='relu')(map_cnn) +1
+
     #ready bufferForOmega dense
     bufferForOmega = layers.Dense(1, activation='relu')(done_buffer_list)
     bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
     bufferForOmega = layers.Dense(1, activation='relu')(bufferForOmega)
-    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1)
+    bufferForOmega = tf.squeeze(bufferForOmega, axis=-1) + 1 
 
     #Concate bufferForOmega and mapCNN
     mixture = layers.concatenate([map_cnn, bufferForOmega], axis=-1)
