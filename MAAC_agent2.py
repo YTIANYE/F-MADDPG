@@ -297,6 +297,8 @@ def center_critic(input_dim_list, cnn_kernel_size):
     r_out = layers.concatenate([buffer_state, pos, bandwidth_vec, mixture, theOmegaReshaped])
                                     # r_out shape = [None, 27]，
                                     #参数三者的shape相同，shape = [None, 4]
+    r_out = layers.Dense(128, activation='relu')(r_out)
+    r_out = layers.Dense(64, activation='relu')(r_out)
     r_out = layers.Dense(32, activation='relu')(r_out)
     r_out = layers.Dense(8, activation='relu')(r_out)
     r_out = layers.Dense(1, activation='relu')(r_out)  # r_out shape = [None, 1]
@@ -759,7 +761,7 @@ class MAACAgent2(object):
         cur_state_map_list = np.expand_dims(self.env.get_obs_fullMap(self.agents), 0)
         self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1]  # need to change here -----done--------
         self.theOmega = np.array(self.theOmega[0])
-        self.theOmega = np.around(self.theOmega, 3)
+        #self.theOmega = np.around(self.theOmega, 3)
         preOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[2]
         print("Update theOmega as : \n", self.theOmega)
         print("What before omega is: \n", preOmega)
