@@ -113,7 +113,7 @@ def agent_actor(input_dim_list, cnn_kernel_size, move_r):  # input_dim_list [(12
 
 # inputs: sensor_map, agent_map, bandwidth_vector;
 # outputs: bandwidth_vec
-def center_actor(input_dim_list, cnn_kernel_size):
+def center_actor(input_dim_list, cnn_kernel_size, biasValue):
     #####set input#####
     
     done_buffer_list = keras.Input(shape=input_dim_list[0])  # 缓冲区列表形状 shape = (None, 4, 2, 5)
@@ -171,8 +171,9 @@ def center_actor(input_dim_list, cnn_kernel_size):
     mixture = map_cnn
     
     #use MLPto fuse the mixture
-    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture) + 1
-    afterFuse = layers.Dense(elementNumber**2, activation='relu')(afterFuse) +1
+    print("The bias is:", biasValue)
+    afterFuse = layers.Dense(elementNumber**2, activation='relu')(mixture) + biasValue
+    afterFuse = layers.Dense(elementNumber**2, activation='relu')(afterFuse) + biasValue
     
     #generate omegaMatrix via softmax
     matrixShape = tf.reshape(afterFuse,(-1, elementNumber, elementNumber))   #shape: (None, 4, 4)
@@ -345,7 +346,7 @@ def circle_argmax(move_dist, move_r):
 class MAACAgent2(object):
 
     def __init__(self, env, tau, gamma, lr_aa, lr_ac, lr_ca, lr_cc, batch, map_size,
-                 epsilon=0.2, sample_method=1, theOmega=1):
+                 epsilon=0.2, sample_method=1, theOmega=1, biasValue=1):
         # aa agent actor; ac agent critic; ca center actor; cc center critic
         self.env = env
         self.agents = self.env.agents
@@ -381,23 +382,24 @@ class MAACAgent2(object):
         self.softmax_memory = {}
         self.center_memory = []
         self.sample_prop = 1 / 4
+        self.biasValue = biasValue
 
         # FL params
         self.theOmega = theOmega
+        self.preOmega = np.zeros((agent_num, agent_num))
 
         # 初始化网络 net init
         # 模型网络
-        print("the shape is:", self.all_agent_state_map_shape)
         self.agent_actors = []  # 所有agent的actor网络
         self.center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
-                                          self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
+                                          self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size, self.biasValue)
         self.agent_critics = []  # 所有agent的critic网络
         self.center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape,
                                             self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
         # 目标网络
         self.target_agent_actors = []
         self.target_center_actor = center_actor([self.buffer_list_shape, self.pos_list_shape,
-                                                 self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size)
+                                                 self.bandvec_shape, self.all_agent_state_map_shape], self.cnn_kernel_size, self.biasValue)
         update_target_net(self.center_actor, self.target_center_actor, tau=0)  # 最初tau=0
         self.target_agent_critics = []
         self.target_center_critic = center_critic([self.buffer_list_shape, self.pos_list_shape,
@@ -762,9 +764,9 @@ class MAACAgent2(object):
         self.theOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[1]  # need to change here -----done--------
         self.theOmega = np.array(self.theOmega[0])
         #self.theOmega = np.around(self.theOmega, 3)
-        preOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[2]
+        self.preOmega = self.center_actor.predict([done_buffer_list, pos_list, cur_state_map_list])[2]
         print("Update theOmega as : \n", self.theOmega)
-        print("What before omega is: \n", preOmega)
+        print("What before omega is: \n", self.preOmega)
     
     # @tf.function
     def train(self, FL_omega, max_epochs=2000, max_step=500, up_freq=8, render=False, render_freq=1, FL=False,
@@ -834,7 +836,9 @@ class MAACAgent2(object):
             print('epoch:%s cur_reward:%f' % (epoch, cur_reward))
             # 打印控制台日志
             f_print_logs = PRINT_LOGS(cur_time).open()
-            print('epoch:%s reward:%f, Current omega: \n %s' % (epoch, cur_reward, self.theOmega), file=f_print_logs)
+            print('epoch:%s reward:%f, before softmax is: \n %s \n Current omega: \n %s' % (epoch, cur_reward,
+                                                                                             self.preOmega.tolist(),
+                                                                                             self.theOmega.tolist()),file=f_print_logs)
             print("Current omega: \n", self.theOmega)
             f_print_logs.close()
 

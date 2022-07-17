@@ -49,7 +49,7 @@ def run(conditions):
     env = mec_env.MEC_MARL_ENV(mec_world, alpha=alpha, beta=beta, aggregate_reward=aggregate_reward)
     # 建立模型
     MAAC = MAAC_agent2.MAACAgent2(env, TAU, GAMMA, LR_A, LR_C, LR_A, LR_C, BATCH_SIZE,
-                                  map_size, Epsilon, sample_method, theOmega=FL_omega)
+                                  map_size, Epsilon, sample_method, theOmega=FL_omega, biasValue=biasValue)
 
     """训练开始"""
     # 记录环境参数
@@ -96,6 +96,7 @@ def experiment_5():
     for i in range(runTimes):
         conditions = params
         print("Condition is ", params)
+        run(conditions)
         try:
             run(conditions)
         except:
