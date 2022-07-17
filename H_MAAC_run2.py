@@ -25,6 +25,7 @@ FL = True  # 控制是否联合学习的开关，默认True
 
 # params['FL'] = FL
 
+theGpuSelection = input("Use GPU: ")
 
 def run(conditions):
     #sensor_num = conditions["sensor_num"]
@@ -35,7 +36,7 @@ def run(conditions):
 
     # 选取GPU
     print("TensorFlow version: ", tf.__version__)
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = theGpuSelection
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))  # 获得当前主机上特定运算设备的列表
     plt.rcParams['figure.figsize'] = (9, 9)  # 设置figure_size尺寸
     # logdir="logs/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -90,8 +91,9 @@ def experiment_5():
     变量：数据源个数
     """
     # sample_methods = [1, 2]  # 默认方式二 # 采样方式一 1；    采样方式二 2
-    # 现在用的采样方式是 1 
-    for i in range(5):
+    # 现在用的采样方式是 1
+    runTimes = int(input("Run times: "))
+    for i in range(runTimes):
         conditions = params
         print("Condition is ", params)
         try:

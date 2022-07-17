@@ -799,9 +799,8 @@ class MAACAgent2(object):
             #     self.agents[anomaly_agent].movable = False
 
             """每20个epoch保存一次环境map"""
-            if render and (epoch % 20 == 1):
-                pass
-                #self.env.render(env_log_dir, epoch, True)
+            if render and (epoch % 20 == 1): 
+                self.env.render(env_log_dir, epoch, True)
                 # sensor_states.append(self.env.DS_state)
 
             """经过max_step后， 结束一个episode，更新经验池，重新开始"""
