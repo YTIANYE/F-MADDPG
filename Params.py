@@ -4,9 +4,9 @@ import random
 
 map_size = 200
 agent_num = 4
-sensor_num = 30
-# agent_num = 8
-# sensor_num = 60
+sensor_num = 60
+#agent_num = 8
+#sensor_num = 60
 obs_r = 60  # 观察半径
 collect_r = 40  # 收集覆盖半径
 speed = 6  # 移动半径
@@ -14,7 +14,7 @@ max_size = 5  # 收集数据和执行数据的最大缓冲区大小
 sensor_lam = 1e3  # 1000 # 泊松分布 lam-发生率或已知次数
 
 # 测试周期：经过大量实验实例观察一般2k个epoch开始趋于稳定，故实验周期设置为3k
-MAX_EPOCH = 1000  # 10000 # 3000
+MAX_EPOCH = 5000  # 10000 # 3000
 MAX_EP_STEPS = 200
 # 大周期
 # MAX_EPOCH = 5000
@@ -23,8 +23,8 @@ MAX_EP_STEPS = 200
 # MAX_EPOCH = 500
 # MAX_EP_STEPS = 20
 # 测试短周期
-# MAX_EPOCH = 100
-# MAX_EP_STEPS = 5
+#MAX_EPOCH = 100
+#MAX_EP_STEPS = 5
 LR_A = 0.001  # learning rate for actor
 LR_C = 0.002  # learning rate for critic
 GAMMA = 0.85  # reward discount
@@ -38,7 +38,8 @@ Epsilon = 0.2  # Probability of random exploration      # Epsilon = 0.1  # Epsil
 up_freq = 8  # 目标网络更新频率 每up_freq个epoch更新一次
 render_freq = 32
 FL = True  # 控制是否联合学习的开关，默认True
-FL_omega = 0.5  # todo 关于联合学习因子其他情况还没有进行实验
+#FL_omega = 0.4  # todo 关于联合学习因子其他情况还没有进行实验
+FL_omega = np.zeros((agent_num, agent_num)).tolist()  # todo 关于联合学习因子其他情况还没有进行实验
 
 epoch_num = 200  # 16 32 64 128  200   # 取最近epoch_num个epoch计算平均值, epoch_num 的取值要大于16，否则需要改正else中的reward代码
 

@@ -103,3 +103,4 @@ def H_MAAC_run():
     """实验运行"""
     experiment_5()
 
+H_MAAC_run()
