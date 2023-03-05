@@ -1,5 +1,7 @@
 ## EdgeFed H-MAAC: Edge Federated Heterogeneous Multi-agent Actor-Critic 
 
+----- This means you are using useStankMap -----
+
 This repository contains a *gym* module for UAV-assisted MEC environment simulation and a TensorFlow implementation of EdgeFed H-MAAC framework.
 
 ### Run

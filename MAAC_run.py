@@ -58,9 +58,10 @@ def run(conditions):
     print("开始时间:", time.localtime(startTime), file=f_print_logs)
 
     # 训练过程
-    MAAC.train(MAX_EPOCH, MAX_EP_STEPS, up_freq=up_freq, render=True, render_freq=render_freq, FL=FL,
-               FL_omega=FL_omega)
-
+    MAAC.train(MAX_EPOCH, MAX_EP_STEPS, up_freq=up_freq, render=True, render_freq=render_freq, FL=FL, FL_omega=FL_omega)
+    #MAAC.testPrint()
+    #quit()
+    
     # 统计执行时间
     endTime = time.time()
     t = endTime - startTime
@@ -96,3 +97,4 @@ def MAAC_run():
     experiment_5()
 
 
+#MAAC_run()

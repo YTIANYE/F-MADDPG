@@ -654,7 +654,15 @@ class MAACAgent(object):
             new_pos_list = np.vstack([sample[3][1] for sample in center_samples])
             """next actions & reward"""
             new_c_actions = self.target_center_actor.predict([new_done_buffer_list, new_pos_list])
+            
+            for each in [new_done_buffer_list, new_pos_list, new_c_actions]:
+                print(each.shape)
+                print("##"*10)
+            
             cq_future = self.target_center_critic.predict([new_done_buffer_list, new_pos_list, new_c_actions])
+
+            quit()
+            
             c_target_qs = c_reward + cq_future * self.gamma  # 目标reward，目标q值
             self.summaries['cq_val'] = np.average(c_reward[0])
 
